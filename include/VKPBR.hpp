@@ -1,6 +1,7 @@
 #pragma once
 
 #include <VulkanRenderer.hpp>
+#include <VulkanTexture.hpp>
 
 class VKPBR : public VulkanRenderer
 {

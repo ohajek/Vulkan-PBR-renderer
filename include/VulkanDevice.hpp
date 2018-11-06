@@ -182,6 +182,27 @@ namespace vkpbr
 			return cmd_buffer;
 		}
 
+		auto finishAndSubmitCmdBuffer(vk::CommandBuffer cmd_buffer, vk::Queue queue, const bool should_free_buffer = true) const -> void
+		{
+			cmd_buffer.end();
+
+			vk::SubmitInfo submit_info = {};
+			submit_info.commandBufferCount = 1;
+			submit_info.pCommandBuffers = &cmd_buffer;
+
+			vk::FenceCreateInfo fence_create_info = {};
+			vk::Fence finished_executing_fence;
+			VK_CHECK_RESULT(logicalDevice.createFence(&fence_create_info, nullptr, &finished_executing_fence));
+
+			VK_CHECK_RESULT(queue.submit(1, &submit_info, finished_executing_fence));
+			VK_CHECK_RESULT(logicalDevice.waitForFences(1, &finished_executing_fence, true, 100000000000));
+			logicalDevice.destroyFence(finished_executing_fence, nullptr);
+
+			if (should_free_buffer) {
+				logicalDevice.freeCommandBuffers(commandPool, 1, &cmd_buffer);
+			}
+		}
+
 		auto createCommandPool(
 			uint32_t queueFamilyIndex,
 			const vk::CommandPoolCreateFlags& createFlags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer) const -> VkCommandPool
