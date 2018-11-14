@@ -15,7 +15,7 @@ auto VKPBR::prepareForRender() -> void
 	const auto filepath = std::string(RESOURCE_DIR);
 	empty.loadFromFile(filepath + "/empty.ktx", vk::Format::eR8G8B8A8Unorm, vulkanDevice.get(), queue);
 	empty.release();
-	*/
+	*/	
 }
 
 auto VKPBR::render() -> void
