@@ -83,7 +83,7 @@ auto VulkanSwapchain::chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabil
 	else {
 		auto width = uint32_t{};
 		auto height = uint32_t{};
-		//window.getSize(width, height);
+		//window.getSize(width, height); //TODO: tohle je divny
 
 		vk::Extent2D actualExtent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
 
@@ -182,69 +182,6 @@ auto VulkanSwapchain::initSurface(const Window& window) -> void
 
 auto VulkanSwapchain::create(uint32_t& width, uint32_t& height) -> void
 {
-	/*
-	const vk::SwapchainKHR old_swapchain = swapchain;
-
-	querySwapchainSupport(physicalDevice);
-	const auto chosen_surface_format = chooseSwapSurfaceFormat(swapchainDetails.formats);
-	const auto chosen_present_mode = chooseSwapPresentMode(swapchainDetails.presentModes);
-	const auto chosen_extent = chooseSwapExtent(swapchainDetails.capabilities);
-
-	//Actual number of images in the queue, maxImageCount = 0 is no limit beside memory req.
-	uint32_t image_count = swapchainDetails.capabilities.minImageCount + 1;
-	if (swapchainDetails.capabilities.maxImageCount > 0 && image_count > swapchainDetails.capabilities.maxImageCount) {
-		image_count = swapchainDetails.capabilities.maxImageCount;
-	}
-
-	vk::SwapchainCreateInfoKHR createInfo = {};
-	createInfo.surface = surface; //which surface swapchain is tied to
-	createInfo.minImageCount = image_count;
-	createInfo.imageFormat = colorFormat;
-	createInfo.imageColorSpace = chosen_surface_format.colorSpace;
-	createInfo.imageExtent = chosen_extent;
-	createInfo.imageArrayLayers = 1; //No. of layers for each image. Always 1 if not stereoscopic 3D program
-	createInfo.imageUsage = vk::ImageUsageFlagBits::eColorAttachment; //Usage. In this case, directly draw to them
-
-	uint32_t queue_family_indices[] = {
-		static_cast<uint32_t>(familyIndices.graphicsFamily.value()),
-		static_cast<uint32_t>(familyIndices.presentFamily.value()),
-		static_cast<uint32_t>(familyIndices.computeFamily.value()),
-	};
-	if (familyIndices.graphicsFamily.value() != familyIndices.presentFamily.value()) {
-		createInfo.imageSharingMode = vk::SharingMode::eConcurrent;
-		createInfo.queueFamilyIndexCount = 2;
-		createInfo.pQueueFamilyIndices = queue_family_indices;
-	}
-	else {
-		createInfo.imageSharingMode = vk::SharingMode::eExclusive;
-		createInfo.queueFamilyIndexCount = 0; // Optional
-		createInfo.pQueueFamilyIndices = nullptr; // Optional
-	}
-	createInfo.preTransform = swapchainDetails.capabilities.currentTransform; //Transf. of images like 90 rotation
-	createInfo.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
-	createInfo.presentMode = chosen_present_mode;
-	createInfo.clipped = VK_TRUE; //True means we dont care for colour of obstructed pixels by eg. another window
-	createInfo.oldSwapchain = old_swapchain; //If the swapchain is invalidated and recreated, give ref. to previous one
-	//TODO: mozna oldSwapchain na nullptr kdyz se recreatuje jinde
-
-	// Set additional usage flag for blitting from the swapchain images if supported
-	vk::FormatProperties format_props;
-	physicalDevice.getFormatProperties(colorFormat, &format_props); //tODO: tady dropujem, spatne colorFormat
-	if ((format_props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eTransferSrcKHR) || (format_props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eBlitSrc)) {
-		createInfo.imageUsage |= vk::ImageUsageFlagBits::eTransferSrc;
-	}
-
-	VK_CHECK_RESULT(device.createSwapchainKHR(&createInfo, nullptr, &swapchain));
-
-	// Retrieve handles to images in swapchain
-	device.getSwapchainImagesKHR(swapchain, &image_count, nullptr);
-	images.resize(image_count);
-	device.getSwapchainImagesKHR(swapchain, &image_count, images.data());
-
-	colorFormat = chosen_surface_format.format;
-	extent = chosen_extent;
-	*/
-
 	const vk::SwapchainKHR old_swapchain = swapchain;
 
 	vk::SurfaceCapabilitiesKHR surface_capabilities;

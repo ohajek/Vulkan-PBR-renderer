@@ -83,6 +83,7 @@ namespace vkpbr {
 		std::vector<vk::Framebuffer>         framebuffers;
 		bool                                 swapchain_recreated;
 		uint32_t                             currentBuffer = 0;
+		bool                                 preparedToRender = false;
 
 		using FPScontainer = struct {
 			float fpsTimer = 0.0f;

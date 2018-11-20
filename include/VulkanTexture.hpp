@@ -1,12 +1,13 @@
 #pragma once
 
+#include <algorithm>
 #include <vulkan/vulkan.hpp>
 
 #include <gli/gli.hpp>
 
 #include <VulkanDevice.hpp>
 #include <Utility.hpp>
-#include <tiny_gltf/tiny_gltf.h>
+#include "tiny_gltf.h"
 
 /*
 VK_IMAGE_LAYOUT_PRESENT_SRC_KHR: Optimal for presentation
@@ -289,7 +290,7 @@ namespace vkpbr {
 
 			width = gltf_image.width;
 			height = gltf_image.height;
-			mipLevels = static_cast<uint32_t>(floor(log2(std::max(width, height))) + 1.0);
+			mipLevels = static_cast<uint32_t>(floor(log2((std::max)(width, height))) + 1.0);
 
 			device->physicalDevice.getFormatProperties(format, &format_properties);
 			assert(format_properties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eBlitSrc);

@@ -1,5 +1,5 @@
 #include <Window.hpp>
-#include "Utility.hpp"
+#include <Utility.hpp>
 
 using window::glfw::Window;
 

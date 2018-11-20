@@ -1,9 +1,6 @@
 #include <memory>
-#include <exception>
-
+#include <CustomException.hpp>
 #include <VKPBR.hpp>
-
-
 
 auto main() -> int
 {
