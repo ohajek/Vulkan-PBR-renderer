@@ -518,7 +518,7 @@ auto VKPBR::createCommandBuffers() -> void
 {
 	vk::CommandBufferBeginInfo buffer_info;
 
-	vk::ClearValue clear_values[2];
+	vk::ClearValue clear_values[3];
 	clear_values[0].color = vk::ClearColorValue(std::array<float, 4> {1.0f, 0.0f, 0.0f, 1.0f} );
 	clear_values[1].depthStencil = vk::ClearDepthStencilValue{ 1.0f, 0 };
 

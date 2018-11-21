@@ -72,7 +72,7 @@ namespace vkpbr {
 			mipLevels = static_cast<uint32_t>(texture.levels());
 
 			/* Prepare texture loading command, buffer and memory */
-			auto[loading_cmd, staging_buffer, staging_memory] =  textureLoadingCommand(format, texture);
+			auto [loading_cmd, staging_buffer, staging_memory] =  textureLoadingCommand(format, texture);
 			auto buffer_regions = setupBufferCopyRegions(texture);
 
 			createImage(format, image_usage);
@@ -524,5 +524,130 @@ namespace vkpbr {
 
 			return std::make_tuple(buffer, buffer_size);
 		}
+	};
+
+	class TextureCubemap : public Texture {
+
+		auto loadFromFile(
+			const std::string& filename,
+			vk::Format format,
+			vkpbr::VulkanDevice* device,
+			vk::Queue copy_queue,
+			vk::ImageUsageFlags usage_flags = vk::ImageUsageFlagBits::eSampled,
+			vk::ImageLayout image_layout = vk::ImageLayout::eShaderReadOnlyOptimal)
+		{
+			gli::texture_cube loaded_texture(gli::load(filename));
+			assert(!loaded_texture.empty());
+
+			this->device = device;
+			width = static_cast<uint32_t>(loaded_texture.extent().x);
+			height = static_cast<uint32_t>(loaded_texture.extent().y);
+			mipLevels = static_cast<uint32_t>(loaded_texture.levels());
+
+			auto staging_buffer = copyDataToStagingBuffer(loaded_texture);
+
+			auto buffer_copy_regions = setupBufferCopyRegions(loaded_texture);
+
+
+
+
+
+
+
+
+
+
+
+		}
+
+		auto copyDataToStagingBuffer(gli::texture_cube& loaded_texture) const -> vk::Buffer&
+		{
+			vk::MemoryAllocateInfo allocate_info = {};
+			vk::MemoryRequirements memory_requirements = {};
+
+			auto staging_buffer = vk::Buffer{};
+			auto staging_memory = vk::DeviceMemory{};
+
+			vk::BufferCreateInfo buffer_create_info = {};
+			buffer_create_info.size = loaded_texture.size();
+			buffer_create_info.usage = vk::BufferUsageFlagBits::eTransferSrc;
+			buffer_create_info.sharingMode = vk::SharingMode::eExclusive;
+
+			VK_CHECK_RESULT(device->logicalDevice.createBuffer(&buffer_create_info, nullptr, &staging_buffer));
+
+			device->logicalDevice.getBufferMemoryRequirements(staging_buffer, &memory_requirements);
+			allocate_info.allocationSize = memory_requirements.size;
+			allocate_info.memoryTypeIndex = device->findMemoryType(memory_requirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+
+			VK_CHECK_RESULT(device->logicalDevice.allocateMemory(&allocate_info, nullptr, &staging_memory));
+			device->logicalDevice.bindBufferMemory(staging_buffer, staging_memory, 0);
+
+			/* copy data*/
+			uint8_t* data;
+			VK_CHECK_RESULT(device->logicalDevice.mapMemory(staging_memory, 0, memory_requirements.size, static_cast<vk::MemoryMapFlags>(0), reinterpret_cast<void**>(&data)));
+			memcpy(data, loaded_texture.data(), loaded_texture.size());
+			device->logicalDevice.unmapMemory(staging_memory);
+
+			return staging_buffer;
+		}
+
+		auto setupBufferCopyRegions(gli::texture_cube& loaded_texture) const -> std::vector<vk::BufferImageCopy>
+		{
+			auto buffer_copy_regions = std::vector<vk::BufferImageCopy>{};
+			size_t offset = 0;
+
+			for (uint32_t cube_side = 0; cube_side < 6; cube_side++) {
+				for (uint32_t level = 0; level < mipLevels; level++) {
+					vk::BufferImageCopy buffer_copy_region = {};
+					buffer_copy_region.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+					buffer_copy_region.imageSubresource.mipLevel = level;
+					buffer_copy_region.imageSubresource.baseArrayLayer = cube_side;
+					buffer_copy_region.imageSubresource.layerCount = 1;
+					buffer_copy_region.imageExtent.width = static_cast<uint32_t>(loaded_texture[cube_side][level].extent().x);
+					buffer_copy_region.imageExtent.width = static_cast<uint32_t>(loaded_texture[cube_side][level].extent().y);
+					buffer_copy_region.imageExtent.depth = 1;
+					buffer_copy_region.bufferOffset = offset;
+
+					buffer_copy_regions.push_back(buffer_copy_region);
+					offset += loaded_texture[cube_side][level].size(); //increase offset for next level/face
+				}
+			}
+
+			return buffer_copy_regions;
+		}
+
+		auto createImage(gli::texture_cube& loaded_texture, vk::Format& format, const vk::ImageUsageFlags usage_flags) -> void
+		{
+			vk::MemoryAllocateInfo allocate_info = {};
+			vk::MemoryRequirements memory_requirements = {};
+
+			/* optimal tiled image */
+			vk::ImageCreateInfo image_create_info = {};
+			image_create_info.imageType = vk::ImageType::e2D;
+			image_create_info.format = format;
+			image_create_info.mipLevels = mipLevels;
+			image_create_info.samples = vk::SampleCountFlagBits::e1;
+			image_create_info.tiling = vk::ImageTiling::eOptimal;
+			image_create_info.sharingMode = vk::SharingMode::eExclusive;
+			image_create_info.initialLayout = vk::ImageLayout::eUndefined;
+			image_create_info.extent = vk::Extent3D{ width, height, 1 };
+			image_create_info.usage = usage_flags;
+			if (!(image_create_info.usage & vk::ImageUsageFlagBits::eTransferDst)) {
+				image_create_info.usage |= vk::ImageUsageFlagBits::eTransferDst;
+			}
+			image_create_info.arrayLayers = 6;
+			image_create_info.flags = vk::ImageCreateFlagBits::eCubeCompatible;
+
+			VK_CHECK_RESULT(device->logicalDevice.createImage(&image_create_info, nullptr, &image));
+
+			device->logicalDevice.getImageMemoryRequirements(image, &memory_requirements);
+
+			allocate_info.allocationSize = memory_requirements.size;
+			allocate_info.memoryTypeIndex = device->findMemoryType(memory_requirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
+
+			VK_CHECK_RESULT(device->logicalDevice.allocateMemory(&allocate_info, nullptr, &deviceMemory));
+			device->logicalDevice.bindImageMemory(image, deviceMemory, 0);
+		}
+	
 	};
 }

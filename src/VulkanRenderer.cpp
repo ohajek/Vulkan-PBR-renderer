@@ -1,5 +1,6 @@
 #include <VulkanRenderer.hpp>
 #include "Utility.hpp"
+#include <vulkan/vulkan.h>
 
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanDebugFunction(
@@ -295,6 +296,7 @@ auto VulkanRenderer::checkValidationLayerSupport() const -> bool
 
 auto VulkanRenderer::setupDebugCallback() -> void
 {
+	std::cout << "Setting up validation layers" << std::endl;
 	if (settings.validation)
 	{
 		VkDebugReportCallbackCreateInfoEXT create_info = {};
