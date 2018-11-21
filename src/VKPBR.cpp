@@ -434,6 +434,7 @@ auto VKPBR::render() -> void
 	submit_info.pCommandBuffers = &drawCalls[currentBuffer];
 	VK_CHECK_RESULT(queue.submit(1, &submit_info, memoryFences[currentBuffer]));
 
+
 	VulkanRenderer::submitFrame();
 
 	if (rotateModel) {
@@ -519,7 +520,7 @@ auto VKPBR::createCommandBuffers() -> void
 	vk::CommandBufferBeginInfo buffer_info;
 
 	vk::ClearValue clear_values[3];
-	clear_values[0].color = vk::ClearColorValue(std::array<float, 4> {1.0f, 0.0f, 0.0f, 1.0f} );
+	clear_values[0].color = vk::ClearColorValue(std::array<float, 4> {1.0f, 1.0f, 0.0f, 1.0f} );
 	clear_values[1].depthStencil = vk::ClearDepthStencilValue{ 1.0f, 0 };
 
 	vk::RenderPassBeginInfo render_pass_begin_info = {};

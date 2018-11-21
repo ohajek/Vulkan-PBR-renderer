@@ -104,20 +104,20 @@ namespace vkpbr {
 		DepthStencil depthStencil;
 
 
-		VkDebugReportCallbackEXT debugCallback;
-		
+		VkDebugUtilsMessengerEXT debugCallback;
 		static auto createDebugReportCallback(
 			vk::Instance instance,
-			const VkDebugReportCallbackCreateInfoEXT* create_info,
-			const VkAllocationCallbacks* allocator,
-			VkDebugReportCallbackEXT* callback
-		) -> VkResult;
+			const VkDebugUtilsMessengerCreateInfoEXT * create_info,
+			const VkAllocationCallbacks * allocator,
+			VkDebugUtilsMessengerEXT * callback
+		)->VkResult;
 		static auto destroyDebugReportCallback(
 			vk::Instance instance,
-			VkDebugReportCallbackEXT callback,
-			const VkAllocationCallbacks* allocator
+			VkDebugUtilsMessengerEXT callback,
+			const VkAllocationCallbacks * allocator
 		) -> void;
 		auto setupDebugCallback() -> void;
+
 		static auto windowResizeCallback(GLFWwindow* window, int width, int height) -> void;
 		auto recreateSwapchain() -> void;
 

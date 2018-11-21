@@ -4,16 +4,35 @@
 
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanDebugFunction(
-	VkDebugReportFlagsEXT flags,
-	VkDebugReportObjectTypeEXT objType,
-	uint64_t obj,
-	size_t location,
-	int32_t code,
-	const char* layer_prefix,
-	const char* msg,
-	void* userData)
-{
-	std::cerr << "[Validation layer]: " << msg << std::endl;
+	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+	VkDebugUtilsMessageTypeFlagsEXT messageType,
+	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+	void* pUserData) {
+
+	auto message_prefix = std::string();
+	switch (messageSeverity) {
+	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
+		message_prefix = "[LAYER ERROR]:";
+		break;
+	}
+	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
+		message_prefix = "[LAYER WARNING]:";
+		break;
+	}
+	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT: {
+		message_prefix = "[LAYER INFO]:";
+		break;
+	}
+	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT: {
+		message_prefix = "[LAYER DIAGNOSTIC]: ";
+		break;
+	}
+	default:
+		message_prefix = "[Validation layer]: ";
+		break;
+	}
+
+	std::cerr << message_prefix << pCallbackData->pMessage << std::endl;
 
 	return VK_FALSE;
 }
@@ -22,11 +41,11 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanDebugFunction(
 /* DEBUG MESSAGES */
 auto VulkanRenderer::createDebugReportCallback(
 	vk::Instance instance,
-	const VkDebugReportCallbackCreateInfoEXT* create_info,
+	const VkDebugUtilsMessengerCreateInfoEXT* create_info,
 	const VkAllocationCallbacks* allocator,
-	VkDebugReportCallbackEXT* callback) -> VkResult
+	VkDebugUtilsMessengerEXT* callback) -> VkResult
 {
-	const auto createDebugReportCallback = reinterpret_cast<PFN_vkCreateDebugReportCallbackEXT>(instance.getProcAddr("vkCreateDebugReportCallbackEXT"));
+	const auto createDebugReportCallback = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(instance.getProcAddr("vkCreateDebugUtilsMessengerEXT"));
 	if (createDebugReportCallback == nullptr) {
 		return VK_ERROR_EXTENSION_NOT_PRESENT;
 	}
@@ -35,10 +54,10 @@ auto VulkanRenderer::createDebugReportCallback(
 
 auto VulkanRenderer::destroyDebugReportCallback(
 	vk::Instance instance,
-	VkDebugReportCallbackEXT callback,
+	VkDebugUtilsMessengerEXT  callback,
 	const VkAllocationCallbacks* allocator) -> void
 {
-	const auto destroyDebugReportCallback = reinterpret_cast<PFN_vkDestroyDebugReportCallbackEXT>(instance.getProcAddr("vkDestroyDebugReportCallbackEXT"));
+	const auto destroyDebugReportCallback = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(instance.getProcAddr("vkDestroyDebugUtilsMessengerEXT"));
 	destroyDebugReportCallback(instance, callback, allocator);
 }
 
@@ -135,7 +154,7 @@ auto VulkanRenderer::createInstance() -> vk::Result
 	/* Here we get extensions from used window system (Vulkan is platform agnostic) */
 	auto extensions = window.getRequiredExtensions();
 	if (settings.validation) {
-		extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 	}
 
 #ifdef _DEBUG
@@ -299,13 +318,12 @@ auto VulkanRenderer::setupDebugCallback() -> void
 	std::cout << "Setting up validation layers" << std::endl;
 	if (settings.validation)
 	{
-		VkDebugReportCallbackCreateInfoEXT create_info = {};
-		create_info.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-		create_info.flags =
-			VK_DEBUG_REPORT_ERROR_BIT_EXT |
-			VK_DEBUG_REPORT_WARNING_BIT_EXT |
-			VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
-		create_info.pfnCallback = static_cast<PFN_vkDebugReportCallbackEXT>(vulkanDebugFunction);
+		VkDebugUtilsMessengerCreateInfoEXT  create_info = {};
+		create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+		create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+		create_info.pfnUserCallback = vulkanDebugFunction;
+		create_info.pUserData = nullptr;
 		VK_CHECK_RESULT_C(
 			createDebugReportCallback(
 				instance,
