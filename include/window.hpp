@@ -37,15 +37,15 @@ namespace window {
 				}
 			} // WindowGLFW
 
-			GLFWwindow* get();
+			GLFWwindow* get() const;
 
-			auto setUserPointer(void* userData) -> void;
+			auto setUserPointer(void* userData) const -> void;
 
 			using keyFunction = void(GLFWwindow*, int, int, int, int);
-			auto setKeyCallback(keyFunction function) -> void;
+			auto setKeyCallback(keyFunction function) const -> void;
 
 			using resizeFunction = void(GLFWwindow*, int, int);
-			auto setResizeCallback(resizeFunction function) -> void;
+			auto setResizeCallback(resizeFunction function) const -> void;
 
 			auto shoudlClose() const -> bool;
 
@@ -53,15 +53,15 @@ namespace window {
 
 			auto Window::createWindowSurface(vk::Instance& instance, VkSurfaceKHR& surface, const VkAllocationCallbacks* allocCallback) const -> void;
 
-			auto pollEvents() -> void;
-			
-			auto getRequiredExtensions() -> std::vector<const char*>;
+			static auto pollEvents() -> void;
+
+			static auto getRequiredExtensions() -> std::vector<const char*>;
 
 			static auto windowKeyCallback(GLFWwindow *pWindow, int key, int scancode, int action, int mods) -> void;
 
 			class Deleter {
 			public:
-				auto operator()(GLFWwindow* raw_handle) -> void;
+				auto operator()(GLFWwindow* raw_handle) const -> void;
 			};
 
 		protected:

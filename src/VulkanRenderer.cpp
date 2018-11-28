@@ -32,7 +32,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanDebugFunction(
 		break;
 	}
 
-	std::cerr << message_prefix << pCallbackData->pMessage << std::endl;
+	std::cerr << message_prefix << pCallbackData->pMessage << std::endl << std::endl;
 
 	return VK_FALSE;
 }
@@ -72,6 +72,7 @@ VulkanRenderer::VulkanRenderer()
 
 VulkanRenderer::~VulkanRenderer()
 {
+	/*
 	swapchain.destroy();
 	device.destroyDescriptorPool(descriptorPool, nullptr);
 	device.freeCommandBuffers(commandPool, static_cast<uint32_t>(drawCalls.size()), drawCalls.data());
@@ -89,11 +90,12 @@ VulkanRenderer::~VulkanRenderer()
 	for (auto& fence : memoryFences) {
 		device.destroyFence(fence, nullptr);
 	}
-	vulkanDevice.release();
+	vulkanDevice.reset();
 	if (settings.validation) {
 		destroyDebugReportCallback(instance, debugCallback, nullptr);
 	}
 	instance.destroy();
+	//*/
 }
 
 auto VulkanRenderer::initVulkan() -> void
@@ -174,7 +176,6 @@ auto VulkanRenderer::createInstance() -> vk::Result
 	}
 	createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
 	createInfo.ppEnabledExtensionNames = extensions.data();
-	createInfo.enabledLayerCount = 0;
 
 	return vk::createInstance(&createInfo, nullptr, &instance);
 }
@@ -187,21 +188,21 @@ auto VulkanRenderer::prepareForRender() -> void
 
 	/* Sync. init */
 	vk::SemaphoreCreateInfo semaphore_create_info = {};
-	VK_CHECK_RESULT(device.createSemaphore(&semaphore_create_info, nullptr, &presentCompleteSemaphore));
-	VK_CHECK_RESULT(device.createSemaphore(&semaphore_create_info, nullptr, &renderCompleteSemaphore));
+	VK_ASSERT(device.createSemaphore(&semaphore_create_info, nullptr, &presentCompleteSemaphore));
+	VK_ASSERT(device.createSemaphore(&semaphore_create_info, nullptr, &renderCompleteSemaphore));
 
 	vk::FenceCreateInfo fence_create_info = {};
 	fence_create_info.flags = vk::FenceCreateFlagBits::eSignaled;
 	memoryFences.resize(swapchain.imageCount);
 	for (auto& fence : memoryFences) {
-		VK_CHECK_RESULT(device.createFence(&fence_create_info, nullptr, &fence));
+		VK_ASSERT(device.createFence(&fence_create_info, nullptr, &fence));
 	}
 
 	/* Command pool */
 	vk::CommandPoolCreateInfo command_pool_create_info = {};
 	command_pool_create_info.queueFamilyIndex = vulkanDevice->queueFamilyIndices.graphicsFamily.value(); //predani graphics queue
 	command_pool_create_info.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
-	VK_CHECK_RESULT(device.createCommandPool(&command_pool_create_info, nullptr, &commandPool));
+	VK_ASSERT(device.createCommandPool(&command_pool_create_info, nullptr, &commandPool));
 
 	/* Command buffers / draw calls */
 	createCommandBuffers();
@@ -211,7 +212,7 @@ auto VulkanRenderer::prepareForRender() -> void
 
 	/* Pipeline */
 	vk::PipelineCacheCreateInfo pipeline_cache_create_info = {};
-	VK_CHECK_RESULT(device.createPipelineCache(&pipeline_cache_create_info, nullptr, &pipelineCache));
+	VK_ASSERT(device.createPipelineCache(&pipeline_cache_create_info, nullptr, &pipelineCache));
 
 	/* Framebuffer */
 	createFramebuffer();
@@ -241,7 +242,7 @@ auto VulkanRenderer::setupWindow() -> void
 auto VulkanRenderer::renderLoop() -> void
 {
 	while (!window.shoudlClose()) {
-		window.pollEvents();
+		glfw::Window::pollEvents();
 
 		renderFrame();
 	}
@@ -277,13 +278,13 @@ auto VulkanRenderer::prepareFrame() -> void
 		recreateSwapchain();
 	}
 	else {
-		VK_CHECK_RESULT(result);
+		VK_ASSERT(result);
 	}
 }
 
 auto VulkanRenderer::submitFrame() const -> void
 {
-	VK_CHECK_RESULT(swapchain.presentToQueue(queue, currentBuffer, renderCompleteSemaphore));
+	VK_ASSERT(swapchain.presentToQueue(queue, currentBuffer, renderCompleteSemaphore));
 }
 
 auto VulkanRenderer::checkValidationLayerSupport() const -> bool
@@ -315,16 +316,16 @@ auto VulkanRenderer::checkValidationLayerSupport() const -> bool
 
 auto VulkanRenderer::setupDebugCallback() -> void
 {
-	std::cout << "Setting up validation layers" << std::endl;
 	if (settings.validation)
 	{
+		std::cout << "Setting up validation layers" << std::endl;
 		VkDebugUtilsMessengerCreateInfoEXT  create_info = {};
 		create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
 		create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 		create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 		create_info.pfnUserCallback = vulkanDebugFunction;
 		create_info.pUserData = nullptr;
-		VK_CHECK_RESULT_C(
+		VK_ASSERT_C(
 			createDebugReportCallback(
 				instance,
 				&create_info,
@@ -335,7 +336,7 @@ auto VulkanRenderer::setupDebugCallback() -> void
 	}
 }
 
-auto VulkanRenderer::windowResizeCallback(GLFWwindow * window, int width, int height) -> void
+auto VulkanRenderer::windowResizeCallback(GLFWwindow* window, int width, int height) -> void
 {
 	auto renderer = reinterpret_cast<VulkanRenderer*>(glfwGetWindowUserPointer(window));
 	renderer->recreateSwapchain();
@@ -343,12 +344,17 @@ auto VulkanRenderer::windowResizeCallback(GLFWwindow * window, int width, int he
 
 auto VulkanRenderer::recreateSwapchain() -> void
 {
-	if (!swapchain_recreated) {
+	if (!preparedToRender) {
 		return;
 	}
-	swapchain_recreated = false;
+	preparedToRender = false;
 	
 	device.waitIdle();
+	//new width and height
+	int new_width, new_height;
+	window.getSize(new_width, new_height);
+	settings.width = static_cast<uint32_t>(new_width);
+	settings.height = static_cast<uint32_t>(new_height);
 	setupSwapchain();
 	device.destroyImageView(depthStencil.view, nullptr);
 	device.destroyImage(depthStencil.image, nullptr);
@@ -358,18 +364,18 @@ auto VulkanRenderer::recreateSwapchain() -> void
 		device.destroyFramebuffer(framebuffer, nullptr);
 	}
 	createFramebuffer();
-	//detroy command buffers
+	device.freeCommandBuffers(commandPool, static_cast<uint32_t>(drawCalls.size()), drawCalls.data());
 	createCommandBuffers();
-	// build command buffers
+	setupCommandBuffers();
 	device.waitIdle();
 
-	swapchain_recreated = true;
+	preparedToRender = true;
 }
 
 auto VulkanRenderer::selectPhysicalDevice() -> void
 {
 	uint32_t device_count = 0;
-	VK_CHECK_RESULT(instance.enumeratePhysicalDevices(&device_count, nullptr));
+	VK_ASSERT(instance.enumeratePhysicalDevices(&device_count, nullptr));
 
 	if (0 == device_count)
 	{
@@ -438,7 +444,7 @@ auto VulkanRenderer::createCommandBuffers() -> void
 	buffer_allocate_info.commandPool = commandPool;
 	buffer_allocate_info.level = vk::CommandBufferLevel::ePrimary;
 	buffer_allocate_info.commandBufferCount = static_cast<uint32_t>(drawCalls.size());
-	VK_CHECK_RESULT(device.allocateCommandBuffers(&buffer_allocate_info, drawCalls.data()));
+	VK_ASSERT(device.allocateCommandBuffers(&buffer_allocate_info, drawCalls.data()));
 }
 
 auto VulkanRenderer::createRenderPass() -> void
@@ -522,7 +528,7 @@ auto VulkanRenderer::createRenderPass() -> void
 	render_pass_create_info.dependencyCount = static_cast<uint32_t>(subpass_dependencies.size());
 	render_pass_create_info.pDependencies = subpass_dependencies.data();
 	
-	VK_CHECK_RESULT(device.createRenderPass(&render_pass_create_info, nullptr, &renderPass));
+	VK_ASSERT(device.createRenderPass(&render_pass_create_info, nullptr, &renderPass));
 }
 
 auto VulkanRenderer::createFramebuffer() -> void
@@ -557,7 +563,7 @@ auto VulkanRenderer::createFramebuffer() -> void
 	depth_stencil_view.subresourceRange.layerCount = 1;
 
 	vk::MemoryRequirements memory_requirements = {};
-	VK_CHECK_RESULT(device.createImage(&image_create_info, nullptr, &depthStencil.image));
+	VK_ASSERT(device.createImage(&image_create_info, nullptr, &depthStencil.image));
 	device.getImageMemoryRequirements(depthStencil.image, &memory_requirements);
 	memory_allocate_info.allocationSize = memory_requirements.size;
 	memory_allocate_info.memoryTypeIndex = vulkanDevice->findMemoryType(
@@ -565,11 +571,11 @@ auto VulkanRenderer::createFramebuffer() -> void
 		vk::MemoryPropertyFlagBits::eDeviceLocal
 	);
 
-	VK_CHECK_RESULT(device.allocateMemory(&memory_allocate_info, nullptr, &depthStencil.memory));
+	VK_ASSERT(device.allocateMemory(&memory_allocate_info, nullptr, &depthStencil.memory));
 	device.bindImageMemory(depthStencil.image, depthStencil.memory, 0);
 
 	depth_stencil_view.image = depthStencil.image;
-	VK_CHECK_RESULT(device.createImageView(&depth_stencil_view, nullptr, &depthStencil.view));
+	VK_ASSERT(device.createImageView(&depth_stencil_view, nullptr, &depthStencil.view));
 
 	vk::ImageView attachments[4];
 	attachments[1] = depthStencil.view;
@@ -587,7 +593,7 @@ auto VulkanRenderer::createFramebuffer() -> void
 	framebuffers.resize(swapchain.imageCount);
 	for (uint32_t i = 0; i < framebuffers.size(); i++) {
 		attachments[0] = swapchain.buffers[i].view;
-		VK_CHECK_RESULT(device.createFramebuffer(&framebuffer_create_info, nullptr, &framebuffers[i]));
+		VK_ASSERT(device.createFramebuffer(&framebuffer_create_info, nullptr, &framebuffers[i]));
 	}
 }
 

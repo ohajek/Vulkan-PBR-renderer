@@ -111,7 +111,7 @@ namespace vkpbr {
 				this->device = device;
 				uniformBlock.matrix = matrix;
 
-				VK_CHECK_RESULT(
+				VK_ASSERT(
 					device->createBuffer(
 						sizeof(uniformBlock),
 						vk::BufferUsageFlagBits::eUniformBuffer,
@@ -277,7 +277,7 @@ namespace vkpbr {
 				}
 
 				/* Node with children */
-				if (node.children.size() > 0) {
+				if (!node.children.empty()) {
 					for (auto i = 0; i < node.children.size(); i++) {
 						loadNode(
 							new_node,
@@ -493,8 +493,8 @@ namespace vkpbr {
 					exit(EXIT_FAILURE); //TODO: predelat na throw
 				}
 
-				auto vertex_buffer_size = vertex_buffer.size() * sizeof(Vertex);
-				auto index_buffer_size = index_buffer.size() * sizeof(uint32_t);
+				const auto vertex_buffer_size = vertex_buffer.size() * sizeof(Vertex);
+				const auto index_buffer_size = index_buffer.size() * sizeof(uint32_t);
 				indices.count = static_cast<uint32_t>(index_buffer.size());
 
 				assert((vertex_buffer_size > 0) && (index_buffer_size > 0));
@@ -507,7 +507,7 @@ namespace vkpbr {
 				auto vertex_staging_buffer = StagingBuffer{};
 				auto index_staging_buffer = StagingBuffer{};
 
-				VK_CHECK_RESULT(device->createBuffer(
+				VK_ASSERT(device->createBuffer(
 					vertex_buffer_size,
 					vk::BufferUsageFlagBits::eTransferSrc,
 					vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
@@ -516,7 +516,7 @@ namespace vkpbr {
 					vertex_buffer.data()
 				));
 
-				VK_CHECK_RESULT(device->createBuffer(
+				VK_ASSERT(device->createBuffer(
 					index_buffer_size,
 					vk::BufferUsageFlagBits::eTransferSrc,
 					vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
@@ -527,7 +527,7 @@ namespace vkpbr {
 
 				/* Device local buffers */
 
-				VK_CHECK_RESULT(device->createBuffer(
+				VK_ASSERT(device->createBuffer(
 					vertex_buffer_size,
 					vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
 					vk::MemoryPropertyFlagBits::eDeviceLocal,
@@ -535,7 +535,7 @@ namespace vkpbr {
 					vertices.memory
 				));
 
-				VK_CHECK_RESULT(device->createBuffer(
+				VK_ASSERT(device->createBuffer(
 					index_buffer_size,
 					vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
 					vk::MemoryPropertyFlagBits::eDeviceLocal,

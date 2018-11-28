@@ -1,97 +1,15 @@
 #include <VulkanSwapchain.hpp>
 
-//TODO: predelat at nebere kopie
 auto VulkanSwapchain::attach(
-	vk::Instance instance,
-	vk::PhysicalDevice physicalDevice,
-	vk::Device device,
-	vkpbr::VulkanDevice::QueueFamilyIndices familyIndices) -> void
+	const vk::Instance instance,
+	const vk::PhysicalDevice physical_device,
+	const vk::Device device,
+	const vkpbr::VulkanDevice::QueueFamilyIndices family_indices) -> void
 {
 	this->instance = instance;
-	this->physicalDevice = physicalDevice;
+	this->physicalDevice = physical_device;
 	this->device = device;
-	this->familyIndices = familyIndices;
-}
-
-auto VulkanSwapchain::querySwapchainSupport(vk::PhysicalDevice physical_device) -> void
-{
-	//Basic surface capabilities
-	physical_device.getSurfaceCapabilitiesKHR(surface, &swapchainDetails.capabilities);
-
-	//Supported surface formats
-	uint32_t format_count = 0;
-	physical_device.getSurfaceFormatsKHR(surface, &format_count, nullptr);
-
-	if (format_count > 0) {
-		swapchainDetails.formats.resize(format_count);
-		physical_device.getSurfaceFormatsKHR(surface, &format_count, swapchainDetails.formats.data());
-	}
-
-	//Supported presentation modes
-	uint32_t present_modes_count = 0;
-	physical_device.getSurfacePresentModesKHR(surface, &present_modes_count, nullptr);
-
-	if (present_modes_count > 0) {
-		swapchainDetails.presentModes.resize(present_modes_count);
-		physical_device.getSurfacePresentModesKHR(surface, &present_modes_count, swapchainDetails.presentModes.data());
-	}
-}
-
-auto VulkanSwapchain::chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats) const -> vk::SurfaceFormatKHR
-{
-	//Best case scenario: if the surface has no prefered format, set colorspace to SRGB and format to RGB 8bit
-	if (availableFormats.size() == 1 && availableFormats[0].format == vk::Format::eUndefined) {
-		return { vk::Format::eB8G8R8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear };
-	}
-
-	//If we are free to choose
-	for (const auto &availableFormat : availableFormats) {
-		if (availableFormat.format == vk::Format::eB8G8R8A8Unorm && availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
-			return availableFormat;
-		}
-	}
-
-	//Is is possible to rank available formats based on some metric but it usually ok take the first one
-	return availableFormats[0];
-}
-
-auto VulkanSwapchain::chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes) const ->vk::PresentModeKHR
-{
-	/*
-	Here we are lookig for triple buffering option and if its not found, then look for immediate mode
-	FIFO mode is guaranteed to be available but there might be problems with it in some drivers
-	*/
-	auto selected_mode = vk::PresentModeKHR::eFifo;
-
-	for (const auto& availablePresentMode : availablePresentModes) {
-		if (availablePresentMode == vk::PresentModeKHR::eMailbox) {
-			return availablePresentMode;
-		}
-		else if (availablePresentMode == vk::PresentModeKHR::eImmediate) {
-			selected_mode = availablePresentMode;
-		}
-	}
-
-	return selected_mode;
-}
-
-auto VulkanSwapchain::chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities) const ->vk::Extent2D
-{
-	if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
-		return capabilities.currentExtent;
-	}
-	else {
-		auto width = uint32_t{};
-		auto height = uint32_t{};
-		//window.getSize(width, height); //TODO: tohle je divny
-
-		vk::Extent2D actualExtent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
-
-		actualExtent.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, actualExtent.width));
-		actualExtent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, actualExtent.height));
-
-		return actualExtent;
-	}	
+	this->familyIndices = family_indices;
 }
 
 auto VulkanSwapchain::initSurface(const Window& window) -> void
@@ -113,15 +31,15 @@ auto VulkanSwapchain::initSurface(const Window& window) -> void
 		physicalDevice.getSurfaceSupportKHR(i, surface, &supports_present[i]);
 	}
 
-	uint32_t graphics_queue = UINT32_MAX;
-	uint32_t present_queue = UINT32_MAX;
+	auto graphics_queue = UINT32_MAX;
+	auto present_queue = UINT32_MAX;
 	for (uint32_t i = 0; i < queue_count; i++) {
 		if ((queue_properties[i].queueFlags & vk::QueueFlagBits::eGraphics)) {
 			if (graphics_queue == UINT32_MAX) {
 				graphics_queue = i;
 			}
 
-			if (supports_present[i] == true) {
+			if (supports_present[i] == VK_TRUE) {
 				graphics_queue = i;
 				present_queue = i;
 				break;
@@ -132,7 +50,7 @@ auto VulkanSwapchain::initSurface(const Window& window) -> void
 	/* Search for separate present queue if graphics q. doesnt support it */
 	if (present_queue == UINT32_MAX) {
 		for (uint32_t i = 0; i < queue_count; i++) {
-			if (supports_present[i] == true) {
+			if (supports_present[i] == VK_TRUE) {
 				present_queue = i;
 				break;
 			}
@@ -140,22 +58,21 @@ auto VulkanSwapchain::initSurface(const Window& window) -> void
 	}
 
 	if (graphics_queue == UINT32_MAX || present_queue == UINT32_MAX) {
-		throw std::runtime_error("[ERROR] Could not find graphics or present queue!");
+		throw std::runtime_error("[EXCEPTION] Could not find graphics or present queue!");
 	}
 
-
 	if (graphics_queue != present_queue) {
-		throw std::runtime_error("[ERROR] No support for separate graphics and present queue!");
+		throw std::runtime_error("[EXCEPTION] No support for separate graphics and present queue!");
 	}
 
 	queueIndex = graphics_queue;
 
 	uint32_t format_count;
-	VK_CHECK_RESULT(physicalDevice.getSurfaceFormatsKHR(surface, &format_count, nullptr));
+	VK_ASSERT(physicalDevice.getSurfaceFormatsKHR(surface, &format_count, nullptr));
 	assert(format_count > 0);
 
 	auto surface_formats = std::vector<vk::SurfaceFormatKHR>(format_count);
-	VK_CHECK_RESULT(physicalDevice.getSurfaceFormatsKHR(surface, &format_count, surface_formats.data()));
+	VK_ASSERT(physicalDevice.getSurfaceFormatsKHR(surface, &format_count, surface_formats.data()));
 
 
 	if ((format_count == 1) && (surface_formats[0].format == vk::Format::eUndefined)) {
@@ -163,8 +80,8 @@ auto VulkanSwapchain::initSurface(const Window& window) -> void
 		colorSpace = surface_formats[0].colorSpace;
 	}
 	else {
-		bool found_desired_format = false;
-		for (auto& surface_format : surface_formats) {
+		auto found_desired_format = false;
+		for (auto&& surface_format : surface_formats) {
 			if (surface_format.format == vk::Format::eB8G8R8A8Srgb) {
 				colorFormat = surface_format.format;
 				colorSpace = surface_format.colorSpace;
@@ -182,17 +99,17 @@ auto VulkanSwapchain::initSurface(const Window& window) -> void
 
 auto VulkanSwapchain::create(uint32_t& width, uint32_t& height) -> void
 {
-	const vk::SwapchainKHR old_swapchain = swapchain;
+	const auto old_swapchain = swapchain;
 
 	vk::SurfaceCapabilitiesKHR surface_capabilities;
-	VK_CHECK_RESULT(physicalDevice.getSurfaceCapabilitiesKHR(surface, &surface_capabilities));
+	VK_ASSERT(physicalDevice.getSurfaceCapabilitiesKHR(surface, &surface_capabilities));
 
 	uint32_t present_mode_count;
-	VK_CHECK_RESULT(physicalDevice.getSurfacePresentModesKHR(surface, &present_mode_count, nullptr));
+	VK_ASSERT(physicalDevice.getSurfacePresentModesKHR(surface, &present_mode_count, nullptr));
 	assert(present_mode_count > 0);
 
 	auto present_modes = std::vector<vk::PresentModeKHR>(present_mode_count);
-	VK_CHECK_RESULT(physicalDevice.getSurfacePresentModesKHR(surface, &present_mode_count, present_modes.data()));
+	VK_ASSERT(physicalDevice.getSurfacePresentModesKHR(surface, &present_mode_count, present_modes.data()));
 
 	vk::Extent2D swapchain_extent = {};
 	// special value of 0xffffffff means the surface will be set by swapchain
@@ -208,10 +125,10 @@ auto VulkanSwapchain::create(uint32_t& width, uint32_t& height) -> void
 
 
 	/* Swapchain present mode */
-	vk::PresentModeKHR present_mode = vk::PresentModeKHR::eFifo;
+	const auto present_mode = vk::PresentModeKHR::eFifo;
 
 	/* Number of images */
-	uint32_t swapchain_images_count = surface_capabilities.minImageCount + 1;
+	auto swapchain_images_count = surface_capabilities.minImageCount + 1;
 	if ((surface_capabilities.maxImageCount > 0) && (swapchain_images_count > surface_capabilities.maxImageCount)) {
 		swapchain_images_count = surface_capabilities.maxImageCount;
 	}
@@ -225,7 +142,7 @@ auto VulkanSwapchain::create(uint32_t& width, uint32_t& height) -> void
 		pre_transform = surface_capabilities.currentTransform;
 	}
 
-	vk::CompositeAlphaFlagBitsKHR composite_alpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
+	auto composite_alpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
 	auto composite_alpha_flags = std::vector<vk::CompositeAlphaFlagBitsKHR> {
 		vk::CompositeAlphaFlagBitsKHR::eOpaque,
 		vk::CompositeAlphaFlagBitsKHR::ePreMultiplied,
@@ -266,7 +183,7 @@ auto VulkanSwapchain::create(uint32_t& width, uint32_t& height) -> void
 		create_info.imageUsage |= vk::ImageUsageFlagBits::eTransferSrc;
 	}
 
-	VK_CHECK_RESULT(device.createSwapchainKHR(&create_info, nullptr, &swapchain));
+	VK_ASSERT(device.createSwapchainKHR(&create_info, nullptr, &swapchain));
 
 	if (old_swapchain) {
 		for (uint32_t i = 0; i < imageCount; i++) {
@@ -274,10 +191,10 @@ auto VulkanSwapchain::create(uint32_t& width, uint32_t& height) -> void
 		}
 		device.destroySwapchainKHR(old_swapchain, nullptr);
 	}
-	VK_CHECK_RESULT(device.getSwapchainImagesKHR(swapchain, &imageCount, nullptr));
+	VK_ASSERT(device.getSwapchainImagesKHR(swapchain, &imageCount, nullptr));
 
 	images.resize(imageCount);
-	VK_CHECK_RESULT(device.getSwapchainImagesKHR(swapchain, &imageCount, images.data()));
+	VK_ASSERT(device.getSwapchainImagesKHR(swapchain, &imageCount, images.data()));
 
 	buffers.resize(imageCount);
 	for (uint32_t i = 0; i < imageCount; i++) {
@@ -296,32 +213,32 @@ auto VulkanSwapchain::create(uint32_t& width, uint32_t& height) -> void
 		color_attachment_view.subresourceRange.baseArrayLayer = 0;
 		color_attachment_view.subresourceRange.layerCount = 1;
 		color_attachment_view.viewType = vk::ImageViewType::e2D;
-		//color_attachment_view.flags = 0;
+		color_attachment_view.flags =  static_cast<vk::ImageViewCreateFlagBits>(0);
 
 		buffers[i].image = images[i];
 		color_attachment_view.image = buffers[i].image;
 
-		device.createImageView(&color_attachment_view, nullptr, &buffers[i].view);
+		VK_ASSERT(device.createImageView(&color_attachment_view, nullptr, &buffers[i].view));
 	}
 }
 	
-auto VulkanSwapchain::acquireNextImage(vk::Semaphore imageAvailableSemaphore, uint32_t* imageIndex) const -> vk::Result
+auto VulkanSwapchain::acquireNextImage(const vk::Semaphore image_available_semaphore, uint32_t* image_index) const -> vk::Result
 {
-	return device.acquireNextImageKHR(swapchain, UINT64_MAX, imageAvailableSemaphore, nullptr, imageIndex);
+	return device.acquireNextImageKHR(swapchain, UINT64_MAX, image_available_semaphore, nullptr, image_index);
 }
 
-auto VulkanSwapchain::presentToQueue(vk::Queue queue, uint32_t imageIndex, vk::Semaphore waitSemaphore) const -> vk::Result
+auto VulkanSwapchain::presentToQueue(vk::Queue queue, uint32_t image_index, vk::Semaphore wait_semaphore) const -> vk::Result
 {
-	vk::PresentInfoKHR presentInfo = {};
-	presentInfo.pNext = nullptr;
-	presentInfo.swapchainCount = 1;
-	presentInfo.pSwapchains = &swapchain;
-	presentInfo.pImageIndices = &imageIndex;
-
-	presentInfo.pWaitSemaphores = &waitSemaphore;
-	presentInfo.waitSemaphoreCount = 1;
-
-	return queue.presentKHR(&presentInfo);
+	vk::PresentInfoKHR present_info = {};
+	present_info.pNext = nullptr;
+	present_info.swapchainCount = 1;
+	present_info.pSwapchains = &swapchain;
+	present_info.pImageIndices = &image_index;
+	if (nullptr != wait_semaphore) {
+		present_info.pWaitSemaphores = &wait_semaphore;
+		present_info.waitSemaphoreCount = 1;
+	}
+	return queue.presentKHR(&present_info);
 }
 
 auto VulkanSwapchain::destroy() -> void

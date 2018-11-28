@@ -60,8 +60,8 @@ namespace vkpbr {
 			vk::Format format,
 			vkpbr::VulkanDevice* device,
 			vk::Queue loading_queue,
-			const vk::ImageUsageFlags image_usage = vk::ImageUsageFlagBits::eSampled,
-			const vk::ImageLayout image_layout = vk::ImageLayout::eShaderReadOnlyOptimal)
+			const vk::ImageUsageFlags& image_usage = vk::ImageUsageFlagBits::eSampled,
+			const vk::ImageLayout& image_layout = vk::ImageLayout::eShaderReadOnlyOptimal)
 		{
 			gli::texture2d texture(gli::load(filename.c_str()));
 			assert(!texture.empty());
@@ -158,7 +158,7 @@ namespace vkpbr {
 			device->physicalDevice.getFormatProperties(format, &format_properties);
 
 			vk::MemoryAllocateInfo allocate_info = {};
-			vk::MemoryRequirements memory_requirements;
+			vk::MemoryRequirements memory_requirements = {};
 
 			vk::CommandBuffer loadingCmd = device->createCommandBuffer(vk::CommandBufferLevel::ePrimary, true);
 
@@ -170,18 +170,18 @@ namespace vkpbr {
 			buffer_create_info.usage = vk::BufferUsageFlagBits::eTransferSrc;
 			buffer_create_info.sharingMode = vk::SharingMode::eExclusive;
 
-			VK_CHECK_RESULT(device->logicalDevice.createBuffer(&buffer_create_info, nullptr, &staging_buffer));
+			VK_ASSERT(device->logicalDevice.createBuffer(&buffer_create_info, nullptr, &staging_buffer));
 			device->logicalDevice.getBufferMemoryRequirements(staging_buffer, &memory_requirements);
 
 			allocate_info.allocationSize = memory_requirements.size;
 			allocate_info.memoryTypeIndex = device->findMemoryType(memory_requirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
-			VK_CHECK_RESULT(device->logicalDevice.allocateMemory(&allocate_info, nullptr, &staging_memory));
+			VK_ASSERT(device->logicalDevice.allocateMemory(&allocate_info, nullptr, &staging_memory));
 			device->logicalDevice.bindBufferMemory(staging_buffer, staging_memory, 0);
 
 			// Copy texture data
 			uint8_t* data;
-			VK_CHECK_RESULT(device->logicalDevice.mapMemory(staging_memory, 0, memory_requirements.size, vk::MemoryMapFlagBits(), reinterpret_cast<void**>(&data)));
+			VK_ASSERT(device->logicalDevice.mapMemory(staging_memory, 0, memory_requirements.size, vk::MemoryMapFlagBits(), reinterpret_cast<void**>(&data)));
 			memcpy(data, texture.data(), texture.size());
 			device->logicalDevice.unmapMemory(staging_memory);
 
@@ -204,7 +204,7 @@ namespace vkpbr {
 			if (!(image_create_info.usage & vk::ImageUsageFlagBits::eTransferDst)) {
 				image_create_info.usage |= vk::ImageUsageFlagBits::eTransferDst;
 			}
-			VK_CHECK_RESULT(device->logicalDevice.createImage(&image_create_info, nullptr, &image));
+			VK_ASSERT(device->logicalDevice.createImage(&image_create_info, nullptr, &image));
 			
 		}
 
@@ -238,7 +238,7 @@ namespace vkpbr {
 			allocate_info.allocationSize = memory_requirements.size;
 			allocate_info.memoryTypeIndex = device->findMemoryType(memory_requirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
 			
-			VK_CHECK_RESULT(device->logicalDevice.allocateMemory(&allocate_info, nullptr, &deviceMemory));
+			VK_ASSERT(device->logicalDevice.allocateMemory(&allocate_info, nullptr, &deviceMemory));
 			device->logicalDevice.bindImageMemory(image, deviceMemory, 0);
 		}
 
@@ -258,7 +258,7 @@ namespace vkpbr {
 			sampler_create_info.anisotropyEnable = device->enabledFeatures.samplerAnisotropy;
 			sampler_create_info.maxAnisotropy = device->enabledFeatures.samplerAnisotropy ? device->deviceProperties.limits.maxSamplerAnisotropy : 1.0f;
 			sampler_create_info.borderColor = vk::BorderColor::eFloatOpaqueWhite;
-			VK_CHECK_RESULT(device->logicalDevice.createSampler(&sampler_create_info, nullptr, &textureSampler));
+			VK_ASSERT(device->logicalDevice.createSampler(&sampler_create_info, nullptr, &textureSampler));
 		}
 	
 		auto createImageView(vk::Format format) -> void
@@ -270,7 +270,7 @@ namespace vkpbr {
 			view_create_info.subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
 			view_create_info.subresourceRange.levelCount = mipLevels;
 			view_create_info.image = image;
-			VK_CHECK_RESULT(device->logicalDevice.createImageView(&view_create_info, nullptr, &imageView));
+			VK_ASSERT(device->logicalDevice.createImageView(&view_create_info, nullptr, &imageView));
 		}
 	};
 
@@ -290,7 +290,7 @@ namespace vkpbr {
 
 			width = gltf_image.width;
 			height = gltf_image.height;
-			mipLevels = static_cast<uint32_t>(floor(log2((std::max)(width, height))) + 1.0);
+			mipLevels = static_cast<uint32_t>(floor(log2(std::max(width, height))) + 1.0);
 
 			device->physicalDevice.getFormatProperties(format, &format_properties);
 			assert(format_properties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eBlitSrc);
@@ -301,23 +301,24 @@ namespace vkpbr {
 
 			vk::Buffer staging_buffer;
 			vk::DeviceMemory staging_memory;
+
 			vk::BufferCreateInfo buffer_create_info = {};
 			buffer_create_info.size = buffer_size;
 			buffer_create_info.usage = vk::BufferUsageFlagBits::eTransferSrc;
 			buffer_create_info.sharingMode = vk::SharingMode::eExclusive;
-			VK_CHECK_RESULT(device->logicalDevice.createBuffer(&buffer_create_info, nullptr, &staging_buffer));
+			VK_ASSERT(device->logicalDevice.createBuffer(&buffer_create_info, nullptr, &staging_buffer));
 			device->logicalDevice.getBufferMemoryRequirements(staging_buffer, &memory_requirements);
 			memory_allocate_info.allocationSize = memory_requirements.size;
 			memory_allocate_info.memoryTypeIndex = device->findMemoryType(
 				memory_requirements.memoryTypeBits,
 				vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
 			);
-			VK_CHECK_RESULT(device->logicalDevice.allocateMemory(&memory_allocate_info, nullptr, &staging_memory));
+			VK_ASSERT(device->logicalDevice.allocateMemory(&memory_allocate_info, nullptr, &staging_memory));
 			device->logicalDevice.bindBufferMemory(staging_buffer, staging_memory, 0);
 	
 
 			uint8_t* data;
-			VK_CHECK_RESULT(
+			VK_ASSERT(
 				device->logicalDevice.mapMemory(
 					staging_memory,
 					0,
@@ -336,17 +337,16 @@ namespace vkpbr {
 			image_create_info.arrayLayers = 1;
 			image_create_info.samples = vk::SampleCountFlagBits::e1;
 			image_create_info.tiling = vk::ImageTiling::eOptimal;
-			image_create_info.usage = vk::ImageUsageFlagBits::eSampled;
 			image_create_info.sharingMode = vk::SharingMode::eExclusive;
 			image_create_info.initialLayout = vk::ImageLayout::eUndefined;
 			image_create_info.extent = vk::Extent3D { width, height, 1 };
 			image_create_info.usage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eSampled;
-			VK_CHECK_RESULT(device->logicalDevice.createImage(&image_create_info, nullptr, &image));
+			VK_ASSERT(device->logicalDevice.createImage(&image_create_info, nullptr, &image));
 			
 			device->logicalDevice.getImageMemoryRequirements(image, &memory_requirements);
 			memory_allocate_info.allocationSize = memory_requirements.size;
 			memory_allocate_info.memoryTypeIndex = device->findMemoryType(memory_requirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
-			VK_CHECK_RESULT(device->logicalDevice.allocateMemory(&memory_allocate_info, nullptr, &deviceMemory));
+			VK_ASSERT(device->logicalDevice.allocateMemory(&memory_allocate_info, nullptr, &deviceMemory));
 			device->logicalDevice.bindImageMemory(image, deviceMemory, 0);
 
 			auto copy_cmd = device->createCommandBuffer(vk::CommandBufferLevel::ePrimary, true);
@@ -412,7 +412,7 @@ namespace vkpbr {
 
 				image_blit.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
 				image_blit.dstSubresource.layerCount = 1;
-				image_blit.dstSubresource.mipLevel = i - 1;
+				image_blit.dstSubresource.mipLevel = i;
 				image_blit.dstOffsets[1].x = static_cast<int32_t>(width >> i);
 				image_blit.dstOffsets[1].y = static_cast<int32_t>(height >> i);
 				image_blit.dstOffsets[1].z = 1;
@@ -479,7 +479,7 @@ namespace vkpbr {
 			sampler_create_info.maxAnisotropy = 16.0;
 			sampler_create_info.anisotropyEnable = true;
 
-			VK_CHECK_RESULT(device->logicalDevice.createSampler(&sampler_create_info, nullptr, &textureSampler));
+			VK_ASSERT(device->logicalDevice.createSampler(&sampler_create_info, nullptr, &textureSampler));
 
 			vk::ImageViewCreateInfo view_create_info = {};
 			view_create_info.image = image;
@@ -489,15 +489,14 @@ namespace vkpbr {
 			view_create_info.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
 			view_create_info.subresourceRange.layerCount = 1;
 			view_create_info.subresourceRange.levelCount = mipLevels;
-			VK_CHECK_RESULT(device->logicalDevice.createImageView(&view_create_info, nullptr, &imageView));
+			VK_ASSERT(device->logicalDevice.createImageView(&view_create_info, nullptr, &imageView));
 
 			descriptorInfo.sampler = textureSampler;
 			descriptorInfo.imageView = imageView;
 			descriptorInfo.imageLayout = imageLayout;
 		}
-
+	
 	private:
-
 		auto copyImageBuffer(tinygltf::Image& gltf_image) const -> std::tuple<uint8_t*, vk::DeviceSize>
 		{
 			uint8_t* buffer = nullptr;
@@ -527,14 +526,14 @@ namespace vkpbr {
 	};
 
 	class TextureCubemap : public Texture {
-
+	public:
 		auto loadFromFile(
 			const std::string& filename,
 			vk::Format format,
 			vkpbr::VulkanDevice* device,
-			vk::Queue copy_queue,
-			vk::ImageUsageFlags usage_flags = vk::ImageUsageFlagBits::eSampled,
-			vk::ImageLayout image_layout = vk::ImageLayout::eShaderReadOnlyOptimal)
+			const vk::Queue copy_queue,
+			const vk::ImageUsageFlags& usage_flags = vk::ImageUsageFlagBits::eSampled,
+			const vk::ImageLayout& image_layout = vk::ImageLayout::eShaderReadOnlyOptimal)
 		{
 			gli::texture_cube loaded_texture(gli::load(filename));
 			assert(!loaded_texture.empty());
@@ -544,23 +543,23 @@ namespace vkpbr {
 			height = static_cast<uint32_t>(loaded_texture.extent().y);
 			mipLevels = static_cast<uint32_t>(loaded_texture.levels());
 
-			auto staging_buffer = copyDataToStagingBuffer(loaded_texture);
+			auto [staging_buffer, staging_memory ] = copyDataToStagingBuffer(loaded_texture);
 
 			auto buffer_copy_regions = setupBufferCopyRegions(loaded_texture);
 
+			createImage(loaded_texture, format, usage_flags);
 
+			copyBufferToImage(staging_buffer, buffer_copy_regions, image_layout, copy_queue);
 
+			createSampler(format);
 
+			device->logicalDevice.freeMemory(staging_memory, nullptr);
+			device->logicalDevice.destroyBuffer(staging_buffer, nullptr);
 
-
-
-
-
-
-
+			updateDescriptorInfo();
 		}
 
-		auto copyDataToStagingBuffer(gli::texture_cube& loaded_texture) const -> vk::Buffer&
+		auto copyDataToStagingBuffer(gli::texture_cube& loaded_texture) const -> std::tuple<vk::Buffer, vk::DeviceMemory>
 		{
 			vk::MemoryAllocateInfo allocate_info = {};
 			vk::MemoryRequirements memory_requirements = {};
@@ -573,22 +572,22 @@ namespace vkpbr {
 			buffer_create_info.usage = vk::BufferUsageFlagBits::eTransferSrc;
 			buffer_create_info.sharingMode = vk::SharingMode::eExclusive;
 
-			VK_CHECK_RESULT(device->logicalDevice.createBuffer(&buffer_create_info, nullptr, &staging_buffer));
+			VK_ASSERT(device->logicalDevice.createBuffer(&buffer_create_info, nullptr, &staging_buffer));
 
 			device->logicalDevice.getBufferMemoryRequirements(staging_buffer, &memory_requirements);
 			allocate_info.allocationSize = memory_requirements.size;
 			allocate_info.memoryTypeIndex = device->findMemoryType(memory_requirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
-			VK_CHECK_RESULT(device->logicalDevice.allocateMemory(&allocate_info, nullptr, &staging_memory));
+			VK_ASSERT(device->logicalDevice.allocateMemory(&allocate_info, nullptr, &staging_memory));
 			device->logicalDevice.bindBufferMemory(staging_buffer, staging_memory, 0);
 
 			/* copy data*/
 			uint8_t* data;
-			VK_CHECK_RESULT(device->logicalDevice.mapMemory(staging_memory, 0, memory_requirements.size, static_cast<vk::MemoryMapFlags>(0), reinterpret_cast<void**>(&data)));
+			VK_ASSERT(device->logicalDevice.mapMemory(staging_memory, 0, memory_requirements.size, static_cast<vk::MemoryMapFlags>(0), reinterpret_cast<void**>(&data)));
 			memcpy(data, loaded_texture.data(), loaded_texture.size());
 			device->logicalDevice.unmapMemory(staging_memory);
 
-			return staging_buffer;
+			return std::make_tuple(staging_buffer, staging_memory);
 		}
 
 		auto setupBufferCopyRegions(gli::texture_cube& loaded_texture) const -> std::vector<vk::BufferImageCopy>
@@ -616,7 +615,7 @@ namespace vkpbr {
 			return buffer_copy_regions;
 		}
 
-		auto createImage(gli::texture_cube& loaded_texture, vk::Format& format, const vk::ImageUsageFlags usage_flags) -> void
+		auto createImage(gli::texture_cube& loaded_texture, vk::Format& format, const vk::ImageUsageFlags& usage_flags) -> void
 		{
 			vk::MemoryAllocateInfo allocate_info = {};
 			vk::MemoryRequirements memory_requirements = {};
@@ -638,16 +637,94 @@ namespace vkpbr {
 			image_create_info.arrayLayers = 6;
 			image_create_info.flags = vk::ImageCreateFlagBits::eCubeCompatible;
 
-			VK_CHECK_RESULT(device->logicalDevice.createImage(&image_create_info, nullptr, &image));
+			VK_ASSERT(device->logicalDevice.createImage(&image_create_info, nullptr, &image));
 
 			device->logicalDevice.getImageMemoryRequirements(image, &memory_requirements);
 
 			allocate_info.allocationSize = memory_requirements.size;
 			allocate_info.memoryTypeIndex = device->findMemoryType(memory_requirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
 
-			VK_CHECK_RESULT(device->logicalDevice.allocateMemory(&allocate_info, nullptr, &deviceMemory));
+			VK_ASSERT(device->logicalDevice.allocateMemory(&allocate_info, nullptr, &deviceMemory));
 			device->logicalDevice.bindImageMemory(image, deviceMemory, 0);
 		}
-	
+
+		auto copyBufferToImage(vk::Buffer staging_buffer, std::vector<vk::BufferImageCopy>& buffer_copy_regions, const vk::ImageLayout image_layout, const vk::Queue copy_queue) -> void
+		{
+			auto copy_cmd = device->createCommandBuffer(vk::CommandBufferLevel::ePrimary, true);
+
+			vk::ImageSubresourceRange subresource_range = {};
+			subresource_range.aspectMask = vk::ImageAspectFlagBits::eColor;
+			subresource_range.baseMipLevel = 0;
+			subresource_range.levelCount = mipLevels;
+			subresource_range.layerCount = 6;
+
+			/* Memory barrier */
+			{
+				vk::ImageMemoryBarrier memory_barrier = {};
+				memory_barrier.oldLayout = vk::ImageLayout::eUndefined;
+				memory_barrier.newLayout = vk::ImageLayout::eTransferDstOptimal;
+				memory_barrier.srcAccessMask = static_cast<vk::AccessFlagBits>(0);
+				memory_barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+				memory_barrier.image = image;
+				memory_barrier.subresourceRange = subresource_range;
+				copy_cmd.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, static_cast<vk::DependencyFlagBits>(0), 0, nullptr, 0, nullptr, 1, &memory_barrier);
+			}
+
+			copy_cmd.copyBufferToImage(
+				staging_buffer,
+				image,
+				vk::ImageLayout::eTransferDstOptimal,
+				static_cast<uint32_t>(buffer_copy_regions.size()),
+				buffer_copy_regions.data()
+			);
+
+			/* after copy, change to shader read */
+			imageLayout = image_layout;
+
+			/* Barrier end */
+			{
+				vk::ImageMemoryBarrier memory_barrier = {};
+				memory_barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+				memory_barrier.newLayout = imageLayout;
+				memory_barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+				memory_barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+				memory_barrier.image = image;
+				memory_barrier.subresourceRange = subresource_range;
+				copy_cmd.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, static_cast<vk::DependencyFlagBits>(0), 0, nullptr, 0, nullptr, 1, &memory_barrier);
+			}
+
+			device->finishAndSubmitCmdBuffer(copy_cmd, copy_queue);
+		}
+
+		auto createSampler(const vk::Format format) -> void
+		{
+			vk::SamplerCreateInfo sampler_create_info = {};
+			sampler_create_info.magFilter = vk::Filter::eLinear;
+			sampler_create_info.minFilter = vk::Filter::eLinear;
+			sampler_create_info.mipmapMode = vk::SamplerMipmapMode::eLinear;
+			sampler_create_info.addressModeU = vk::SamplerAddressMode::eClampToEdge;
+			sampler_create_info.addressModeV = vk::SamplerAddressMode::eClampToEdge;
+			sampler_create_info.addressModeW = vk::SamplerAddressMode::eClampToEdge;
+			sampler_create_info.mipLodBias = 0.0f;
+			sampler_create_info.maxAnisotropy = device->enabledFeatures.samplerAnisotropy ? device->deviceProperties.limits.maxSamplerAnisotropy : 1.0f;
+			sampler_create_info.anisotropyEnable = device->enabledFeatures.samplerAnisotropy;
+			sampler_create_info.compareOp = vk::CompareOp::eNever;
+			sampler_create_info.minLod = 0.0f;
+			sampler_create_info.maxLod = static_cast<float>(mipLevels);
+			sampler_create_info.borderColor = vk::BorderColor::eFloatOpaqueWhite;
+
+			VK_ASSERT(device->logicalDevice.createSampler(&sampler_create_info, nullptr, &textureSampler));
+
+			vk::ImageViewCreateInfo view_create_info = {};
+			view_create_info.viewType = vk::ImageViewType::eCube;
+			view_create_info.format = format;
+			view_create_info.components = { vk::ComponentSwizzle::eR, vk::ComponentSwizzle::eG, vk::ComponentSwizzle::eB, vk::ComponentSwizzle::eA };
+			view_create_info.subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
+			view_create_info.subresourceRange.layerCount = 6;
+			view_create_info.subresourceRange.levelCount = mipLevels;
+			view_create_info.image = image;
+
+			VK_ASSERT(device->logicalDevice.createImageView(&view_create_info, nullptr, &imageView));
+		}
 	};
 }

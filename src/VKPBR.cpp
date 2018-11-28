@@ -28,7 +28,7 @@ VKPBR::VKPBR()
 VKPBR::~VKPBR()
 {
 	/*
-	device.destroyPipeline(pipelines.skybox, nullptr);
+	//device.destroyPipeline(pipelines.skybox, nullptr);
 	device.destroyPipeline(pipelines.pbr, nullptr);
 	device.destroyPipeline(pipelines.pbrAlphaBlend, nullptr);
 
@@ -39,19 +39,19 @@ VKPBR::~VKPBR()
 	device.destroyDescriptorSetLayout(descriptorSetLayouts.material, nullptr);
 
 	models.scene.release(device);
-	models.skybox.release(device);
+	//models.skybox.release(device);
 
 	device.destroyBuffer(uniformBuffers.scene.buffer, nullptr);
-	device.destroyBuffer(uniformBuffers.skybox.buffer, nullptr);
+	//device.destroyBuffer(uniformBuffers.skybox.buffer, nullptr);
 	device.destroyBuffer(uniformBuffers.parameters.buffer, nullptr);
 
 	device.freeMemory(uniformBuffers.scene.memory, nullptr);
-	device.freeMemory(uniformBuffers.skybox.memory, nullptr);
+	//device.freeMemory(uniformBuffers.skybox.memory, nullptr);
 	device.freeMemory(uniformBuffers.parameters.memory, nullptr);
 
 	textures.empty.release();
-	textures.lutBRDF.release();
-	*/
+	//textures.lutBRDF.release();
+	//*/
 }
 
 auto VKPBR::prepareForRender() -> void
@@ -123,7 +123,7 @@ auto VKPBR::setupPipelines() -> void
 	push_constant_range.stageFlags = vk::ShaderStageFlagBits::eFragment;
 	pipeline_layout_create_info.pushConstantRangeCount = 1;
 	pipeline_layout_create_info.pPushConstantRanges = &push_constant_range;
-	VK_CHECK_RESULT(device.createPipelineLayout(&pipeline_layout_create_info, nullptr, &pipelineLayout));
+	VK_ASSERT(device.createPipelineLayout(&pipeline_layout_create_info, nullptr, &pipelineLayout));
 
 	/* Vertex binding */
 	vk::VertexInputBindingDescription vertex_input_binding = { 0, sizeof(vkpbr::gltf::Model::Vertex), vk::VertexInputRate::eVertex };
@@ -160,6 +160,7 @@ auto VKPBR::setupPipelines() -> void
 
 	/* Skybox pipeline */
 
+
 	/* PBR pipeline*/
 	shader_stages = {
 		loadShaderFromFile(device, "pbr_shader.vert.spv", vk::ShaderStageFlagBits::eVertex),
@@ -168,7 +169,7 @@ auto VKPBR::setupPipelines() -> void
 
 	depth_stencil_state_create_info.depthWriteEnable = true;
 	depth_stencil_state_create_info.depthTestEnable = true;
-	VK_CHECK_RESULT(device.createGraphicsPipelines(pipelineCache, 1, &graphics_pipeline_create_info, nullptr, &pipelines.pbr));
+	VK_ASSERT(device.createGraphicsPipelines(pipelineCache, 1, &graphics_pipeline_create_info, nullptr, &pipelines.pbr));
 
 	/* PBR blending */
 	rasterization_state_create_info.cullMode = vk::CullModeFlagBits::eNone;
@@ -180,7 +181,7 @@ auto VKPBR::setupPipelines() -> void
 	blend_attachment_state.srcAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
 	blend_attachment_state.dstAlphaBlendFactor = vk::BlendFactor::eZero;
 	blend_attachment_state.alphaBlendOp = vk::BlendOp::eAdd;
-	VK_CHECK_RESULT(device.createGraphicsPipelines(pipelineCache, 1, &graphics_pipeline_create_info, nullptr, &pipelines.pbrAlphaBlend));
+	VK_ASSERT(device.createGraphicsPipelines(pipelineCache, 1, &graphics_pipeline_create_info, nullptr, &pipelines.pbrAlphaBlend));
 
 	for (auto& shader_stage : shader_stages) {
 		device.destroyShaderModule(shader_stage.module, nullptr);
@@ -216,45 +217,46 @@ auto VKPBR::setupDescriptors() -> void
 	vk::DescriptorPoolCreateInfo descriptor_pool_create_info = {};
 	descriptor_pool_create_info.poolSizeCount = 2;
 	descriptor_pool_create_info.pPoolSizes = pool_sizes.data();
-	descriptor_pool_create_info.maxSets = 2 + material_count + mesh_count;
-	VK_CHECK_RESULT(device.createDescriptorPool(&descriptor_pool_create_info, nullptr, &descriptorPool));
+	descriptor_pool_create_info.maxSets = 1 + material_count + mesh_count; //TODO: tady mozna dva
+	VK_ASSERT(device.createDescriptorPool(&descriptor_pool_create_info, nullptr, &descriptorPool));
+
 
 
 	/* Scene descriptor set (matrices and environment map) */
 	{
 		auto set_layout_bindings = std::vector<vk::DescriptorSetLayoutBinding> {
-			{ 0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, nullptr },
-			{ 1, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment, nullptr },
-			{ 2, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, nullptr },
-			{ 3, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, nullptr },
-			{ 4, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, nullptr },
+			{ 0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, nullptr }
+			//{ 1, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment, nullptr },
+			//{ 2, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, nullptr },
+			//{ 3, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, nullptr },
+			//{ 4, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, nullptr },
 		};
 
 		vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {};
 		descriptor_set_layout_create_info.pBindings = set_layout_bindings.data();
 		descriptor_set_layout_create_info.bindingCount = static_cast<uint32_t>(set_layout_bindings.size());
-		VK_CHECK_RESULT(device.createDescriptorSetLayout(&descriptor_set_layout_create_info, nullptr, &descriptorSetLayouts.scene));
+		VK_ASSERT(device.createDescriptorSetLayout(&descriptor_set_layout_create_info, nullptr, &descriptorSetLayouts.scene));
 
 		vk::DescriptorSetAllocateInfo allocate_info = {};
 		allocate_info.descriptorPool = descriptorPool;
 		allocate_info.pSetLayouts = &descriptorSetLayouts.scene;
 		allocate_info.descriptorSetCount = 1;
-		VK_CHECK_RESULT(device.allocateDescriptorSets(&allocate_info, &descriptorSets.scene));
+		VK_ASSERT(device.allocateDescriptorSets(&allocate_info, &descriptorSets.scene));
 
-		auto write_descriptor_sets = std::array<vk::WriteDescriptorSet, 2> {};
-		/* TODO: doplnit cubemapy*/
+		auto write_descriptor_sets = std::array<vk::WriteDescriptorSet, 1> {};
 
 		write_descriptor_sets[0].descriptorType = vk::DescriptorType::eUniformBuffer;
 		write_descriptor_sets[0].descriptorCount = 1;
 		write_descriptor_sets[0].dstSet = descriptorSets.scene;
 		write_descriptor_sets[0].dstBinding = 0;
 		write_descriptor_sets[0].pBufferInfo = &uniformBuffers.scene.descriptor;
-
+		/*
 		write_descriptor_sets[1].descriptorType = vk::DescriptorType::eUniformBuffer;
 		write_descriptor_sets[1].descriptorCount = 1;
 		write_descriptor_sets[1].dstSet = descriptorSets.scene;
 		write_descriptor_sets[1].dstBinding = 1;
 		write_descriptor_sets[1].pBufferInfo = &uniformBuffers.parameters.descriptor;
+		*/
 
 		device.updateDescriptorSets(static_cast<uint32_t>(write_descriptor_sets.size()), write_descriptor_sets.data(), 0, nullptr);
 	}
@@ -272,14 +274,14 @@ auto VKPBR::setupDescriptors() -> void
 		vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {};
 		descriptor_set_layout_create_info.pBindings = set_layout_bindings.data();
 		descriptor_set_layout_create_info.bindingCount = static_cast<uint32_t>(set_layout_bindings.size());
-		VK_CHECK_RESULT(device.createDescriptorSetLayout(&descriptor_set_layout_create_info, nullptr, &descriptorSetLayouts.material));
+		VK_ASSERT(device.createDescriptorSetLayout(&descriptor_set_layout_create_info, nullptr, &descriptorSetLayouts.material));
 
 		for (auto& material : models.scene.materials) {
 			vk::DescriptorSetAllocateInfo allocate_info = {};
 			allocate_info.descriptorPool = descriptorPool;
 			allocate_info.pSetLayouts = &descriptorSetLayouts.material;
 			allocate_info.descriptorSetCount = 1;
-			VK_CHECK_RESULT(device.allocateDescriptorSets(&allocate_info, &material.descriptorSet));
+			VK_ASSERT(device.allocateDescriptorSets(&allocate_info, &material.descriptorSet));
 
 			auto image_descriptors = std::vector<vk::DescriptorImageInfo>{
 				textures.empty.descriptorInfo,
@@ -328,7 +330,7 @@ auto VKPBR::setupDescriptors() -> void
 			vk::DescriptorSetLayoutCreateInfo set_layout_create_info = {};
 			set_layout_create_info.pBindings = set_layout_bindings.data();
 			set_layout_create_info.bindingCount = static_cast<uint32_t>(set_layout_bindings.size());
-			VK_CHECK_RESULT(device.createDescriptorSetLayout(&set_layout_create_info, nullptr, &descriptorSetLayouts.node));
+			VK_ASSERT(device.createDescriptorSetLayout(&set_layout_create_info, nullptr, &descriptorSetLayouts.node));
 
 			/* per node desc. set */
 			for (auto& node : models.scene.nodes) {
@@ -343,7 +345,7 @@ auto VKPBR::setupDescriptors() -> void
 auto VKPBR::setupUniformBuffers() -> void
 {
 	/* object vertex shader uniform buffer */
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_ASSERT(vulkanDevice->createBuffer(
 		sizeof(uboMatrices),
 		vk::BufferUsageFlagBits::eUniformBuffer,
 		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
@@ -354,7 +356,7 @@ auto VKPBR::setupUniformBuffers() -> void
 	/* skybox vertex shader uniform buffer */
 
 	/* Shared parameters */
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_ASSERT(vulkanDevice->createBuffer(
 		sizeof(uboParameters),
 		vk::BufferUsageFlagBits::eUniformBuffer,
 		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
@@ -366,9 +368,9 @@ auto VKPBR::setupUniformBuffers() -> void
 	//uniformBuffers.skybox.descriptor = { uniformBuffers.scene.buffer, 0, sizeof(uboMatrices) };
 	uniformBuffers.parameters.descriptor = vk::DescriptorBufferInfo{ uniformBuffers.parameters.buffer, 0, sizeof(uboParameters) };
 
-	VK_CHECK_RESULT(device.mapMemory(uniformBuffers.scene.memory, 0, sizeof(uboMatrices), static_cast<vk::MemoryMapFlags>(0), &uniformBuffers.scene.mappedMemory));
+	VK_ASSERT(device.mapMemory(uniformBuffers.scene.memory, 0, sizeof(uboMatrices), static_cast<vk::MemoryMapFlags>(0), &uniformBuffers.scene.mappedMemory));
 	// map skybox
-	VK_CHECK_RESULT(device.mapMemory(uniformBuffers.parameters.memory, 0, sizeof(uboParameters), static_cast<vk::MemoryMapFlags>(0), &uniformBuffers.parameters.mappedMemory));
+	VK_ASSERT(device.mapMemory(uniformBuffers.parameters.memory, 0, sizeof(uboParameters), static_cast<vk::MemoryMapFlags>(0), &uniformBuffers.parameters.mappedMemory));
 
 	updateUniformBuffers();
 	updateParameters();
@@ -419,8 +421,8 @@ auto VKPBR::render() -> void
 	}
 
 	VulkanRenderer::prepareFrame();
-	VK_CHECK_RESULT(device.waitForFences(1, &memoryFences[currentBuffer], true, UINT64_MAX));
-	VK_CHECK_RESULT(device.resetFences(1, &memoryFences[currentBuffer]));
+	VK_ASSERT(device.waitForFences(1, &memoryFences[currentBuffer], VK_TRUE, UINT64_MAX));
+	VK_ASSERT(device.resetFences(1, &memoryFences[currentBuffer]));
 
 	const vk::PipelineStageFlags wait_stage_mask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 
@@ -432,8 +434,7 @@ auto VKPBR::render() -> void
 	submit_info.pSignalSemaphores = &renderCompleteSemaphore;
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = &drawCalls[currentBuffer];
-	VK_CHECK_RESULT(queue.submit(1, &submit_info, memoryFences[currentBuffer]));
-
+	VK_ASSERT(queue.submit(1, &submit_info, memoryFences[currentBuffer])); //TODO: sem me hodi debugger
 
 	VulkanRenderer::submitFrame();
 
@@ -519,7 +520,7 @@ auto VKPBR::createCommandBuffers() -> void
 {
 	vk::CommandBufferBeginInfo buffer_info;
 
-	vk::ClearValue clear_values[3];
+	vk::ClearValue clear_values[2];
 	clear_values[0].color = vk::ClearColorValue(std::array<float, 4> {1.0f, 1.0f, 0.0f, 1.0f} );
 	clear_values[1].depthStencil = vk::ClearDepthStencilValue{ 1.0f, 0 };
 
@@ -533,22 +534,21 @@ auto VKPBR::createCommandBuffers() -> void
 	render_pass_begin_info.pClearValues = clear_values;
 
 	for (size_t i = 0; i < drawCalls.size(); ++i) {
-		auto& drawCall = drawCalls[i];
 		render_pass_begin_info.framebuffer = framebuffers[i];
 
-		VK_CHECK_RESULT(drawCall.begin(&buffer_info));
-		drawCall.beginRenderPass(&render_pass_begin_info, vk::SubpassContents::eInline);
+		VK_ASSERT(drawCalls[i].begin(&buffer_info));
+		drawCalls[i].beginRenderPass(&render_pass_begin_info, vk::SubpassContents::eInline);
 
 		vk::Viewport viewport = {};
 		viewport.width = static_cast<float>(settings.width);
 		viewport.height = static_cast<float>(settings.height);
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f;
-		drawCall.setViewport(0, 1, &viewport);
+		drawCalls[i].setViewport(0, 1, &viewport);
 
 		vk::Rect2D scissor = {};
 		scissor.extent = vk::Extent2D{ settings.width, settings.height };
-		drawCall.setScissor(0, 1, &scissor);
+		drawCalls[i].setScissor(0, 1, &scissor);
 
 		vk::DeviceSize offsets[1] = { 0 };
 
@@ -558,37 +558,38 @@ auto VKPBR::createCommandBuffers() -> void
 		//models.skybox.draw(drawCall);
 
 		/* Render PBR scene */
-		drawCall.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.pbr);
-		vkpbr::gltf::Model& model = models.scene;
+		drawCalls[i].bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.pbr);
+		auto& model = models.scene;
 
-		drawCall.bindVertexBuffers(0, 1, &model.vertices.buffer, offsets);
-		drawCall.bindIndexBuffer(model.indices.buffer, 0, vk::IndexType::eUint32);
+		drawCalls[i].bindVertexBuffers(0, 1, &model.vertices.buffer, offsets);
+		drawCalls[i].bindIndexBuffer(model.indices.buffer, 0, vk::IndexType::eUint32);
 
 		/* Render opaque meshes first */
-		for (auto& node : model.nodes) {
-			renderGLTFNode(node, drawCall, vkpbr::gltf::Material::AlphaMode::opaque);
+		for (auto node : model.nodes) {
+			renderGLTFNode(node, drawCalls[i], vkpbr::gltf::Material::AlphaMode::opaque);
 		}
+		
 		/* Then transparent */
+		/*
 		drawCall.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.pbrAlphaBlend);
 		for (auto& node : model.nodes) {
 			renderGLTFNode(node, drawCall, vkpbr::gltf::Material::AlphaMode::mask);
 		}
 		for (auto& node : model.nodes) {
 			renderGLTFNode(node, drawCall, vkpbr::gltf::Material::AlphaMode::blend);
-		}
+		}*/
 
-		drawCall.endRenderPass();
-		drawCall.end();
+		drawCalls[i].endRenderPass();
+		drawCalls[i].end();
 	}
 }
 
-/* TODO: dodelat environment mapy/dopsat cubemapy*/
 auto VKPBR::loadAssets() -> void
 {
 	const auto& resource_path = std::string(RESOURCE_DIR);
 	textures.empty.loadFromFile(resource_path + "textures/empty.ktx", vk::Format::eR8G8B8A8Unorm, vulkanDevice.get(), queue);
 
-	const auto& test_scene_file = resource_path + "models/glTF-Embedded/DamagedHelmet.gltf";
+	const auto& test_scene_file = resource_path + "models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf";
 	const auto& env_map_file = resource_path + "textures/papermill_hdr16f_cube.ktx";
 
 	uboMatrices.flipUV = 1.0f;
@@ -606,7 +607,7 @@ auto VKPBR::setupNodeDescriptorSet(vkpbr::gltf::Node* node) const -> void
 		allocate_info.descriptorPool = descriptorPool;
 		allocate_info.pSetLayouts = &descriptorSetLayouts.node;
 		allocate_info.descriptorSetCount = 1;
-		VK_CHECK_RESULT(device.allocateDescriptorSets(&allocate_info, &node->mesh->uniformBuffer.descriptorSet));
+		VK_ASSERT(device.allocateDescriptorSets(&allocate_info, &node->mesh->uniformBuffer.descriptorSet));
 
 		vk::WriteDescriptorSet write_descriptor_set = {};
 		write_descriptor_set.descriptorType = vk::DescriptorType::eUniformBuffer;

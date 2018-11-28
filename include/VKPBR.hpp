@@ -30,6 +30,9 @@ public:
 	using Textures = struct {
 		Texture2D empty;
 		Texture2D lutBRDF;
+		TextureCubemap environment;
+		TextureCubemap irradiance;
+		TextureCubemap prefiltered;
 	};
 
 	using Models = struct {
