@@ -57,7 +57,7 @@ IF(WIN32)
         externals/glm
         externals/gli
         externals/glfw
-        externals/vulkan
+        ${Vulkan_INCLUDE_DIRS}
     )
 
 # Linux

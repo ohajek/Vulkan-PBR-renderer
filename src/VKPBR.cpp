@@ -130,9 +130,7 @@ auto VKPBR::setupPipelines() -> void
 	auto vertex_input_attributes = std::vector<vk::VertexInputAttributeDescription> {
 		{ 0, 0, vk::Format::eR32G32B32Sfloat, 0 },
 		{ 1, 0, vk::Format::eR32G32B32Sfloat, sizeof(float) * 3 },
-		{ 2, 0, vk::Format::eR32G32Sfloat, sizeof(float) * 6 },
-		{ 3, 0, vk::Format::eR32G32B32A32Sfloat, sizeof(float) * 8 },
-		{ 4, 0, vk::Format::eR32G32B32A32Sfloat, sizeof(float) * 12 }
+		{ 2, 0, vk::Format::eR32G32Sfloat, sizeof(float) * 6 }
 	};
 
 	vk::PipelineVertexInputStateCreateInfo vertex_input_state_create_info = {};
@@ -435,6 +433,7 @@ auto VKPBR::render() -> void
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = &drawCalls[currentBuffer];
 	VK_ASSERT(queue.submit(1, &submit_info, memoryFences[currentBuffer])); //TODO: sem me hodi debugger
+
 
 	VulkanRenderer::submitFrame();
 
