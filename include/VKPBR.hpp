@@ -123,5 +123,7 @@ public:
 
 	auto loadAssets() -> void;
 
+	auto setupPipelines() -> void;
+
 	auto render() -> void override;
 };
