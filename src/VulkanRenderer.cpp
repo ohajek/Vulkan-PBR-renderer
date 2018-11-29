@@ -72,7 +72,6 @@ VulkanRenderer::VulkanRenderer()
 
 VulkanRenderer::~VulkanRenderer()
 {
-	/*
 	swapchain.destroy();
 	device.destroyDescriptorPool(descriptorPool, nullptr);
 	device.freeCommandBuffers(commandPool, static_cast<uint32_t>(drawCalls.size()), drawCalls.data());
@@ -95,7 +94,6 @@ VulkanRenderer::~VulkanRenderer()
 		destroyDebugReportCallback(instance, debugCallback, nullptr);
 	}
 	instance.destroy();
-	//*/
 }
 
 auto VulkanRenderer::initVulkan() -> void
