@@ -307,11 +307,13 @@ namespace vkpbr {
 						auto pos_min = glm::vec3{};
 						auto pos_max = glm::vec3{};
 
+						/* Vertices */
 						{
 							const float* buffer_position = nullptr;
 							const float* buffer_normals = nullptr;
 							const float* buffer_tex_coords = nullptr;
 
+							/* Position is mandatory */
 							assert(primitive.attributes.find("POSITION") != primitive.attributes.end());
 
 							const auto& position_accessor = model.accessors[primitive.attributes.find("POSITION")->second];
@@ -586,7 +588,7 @@ namespace vkpbr {
 				}
 			}
 
-			auto getNodeDimensions(Node* node, glm::vec3& min, glm::vec3& max) -> void
+			auto getNodeDimensions(Node* node, glm::vec3& min, glm::vec3& max) const -> void
 			{
 				if (node->mesh) {
 					for (auto* primitive : node->mesh->primitives) {
@@ -621,8 +623,7 @@ namespace vkpbr {
 				dimensions.center = (dimensions.min + dimensions.max) / 2.0f;
 				dimensions.radius = glm::distance(dimensions.min, dimensions.max) / 2.0f;
 			}
-
-
+			
 			auto findNode(Node* parent, const uint32_t index) const -> Node*
 			{
 				Node* found_node = nullptr;

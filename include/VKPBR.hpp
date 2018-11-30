@@ -20,8 +20,8 @@ private:
 	};
 
 	using Models = struct {
-		gltf::Model scene;
-		gltf::Model skybox;
+		vkpbr::gltf::Model scene;
+		vkpbr::gltf::Model skybox;
 	};
 
 	using Buffer = struct {
@@ -124,6 +124,19 @@ public:
 	auto loadAssets() -> void;
 
 	auto setupPipelines() -> void;
+
+	auto setupUniformBuffers() -> void;
+
+	auto updateUniformBuffers() -> void;
+
+	auto updateUniformParameters() -> void;
+
+	auto setupDescriptors() -> void;
+
+	auto setupCommandBuffers() -> void override;
+
+	auto renderModelNode(vkpbr::gltf::Node*               node, vk::CommandBuffer cmd_buffer,
+	                     vkpbr::gltf::Material::AlphaMode alpha_mode) const -> void;
 
 	auto render() -> void override;
 };

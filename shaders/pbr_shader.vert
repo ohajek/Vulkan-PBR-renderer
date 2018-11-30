@@ -3,8 +3,6 @@
 layout (location = 0) in vec3 inPos;
 layout (location = 1) in vec3 inNormal;
 layout (location = 2) in vec2 inUV;
-layout (location = 3) in vec4 inJoint0;
-layout (location = 4) in vec4 inWeight0;
 
 layout (set = 0, binding = 0) uniform UBO 
 {
@@ -15,11 +13,11 @@ layout (set = 0, binding = 0) uniform UBO
 	float flipUV;
 } ubo;
 
-layout (set = 2, binding = 0) uniform UBONode {
-	mat4 matrix;
-	mat4 jointMatrix[64];
-	float jointCount;
-} node;
+
+//layout (set = 2, binding = 0) uniform UBONode {
+//	mat4 matrix;
+//} node;
+
 
 layout (location = 0) out vec3 outWorldPos;
 layout (location = 1) out vec3 outNormal;
@@ -33,9 +31,6 @@ out gl_PerVertex
 void main() 
 {
 	vec4 locPos;
-
-	locPos = ubo.model * node.matrix * vec4(inPos, 1.0);
-	outNormal = normalize(transpose(inverse(mat3(ubo.model * node.matrix))) * inNormal);
 
 	locPos.y = -locPos.y;
 	outWorldPos = locPos.xyz / locPos.w;
