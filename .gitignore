@@ -2,3 +2,4 @@
 build
 include/*.TMP
 src/*.TMP
+shaders/*.spv
