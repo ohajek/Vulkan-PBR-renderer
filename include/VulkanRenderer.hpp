@@ -33,7 +33,8 @@ namespace vkpbr {
 		} settings;
 		const std::vector<const char*> wantedLayers = {
 			"VK_LAYER_LUNARG_standard_validation",
-			"VK_LAYER_LUNARG_assistant_layer"
+			"VK_LAYER_LUNARG_assistant_layer",
+			"VK_LAYER_LUNARG_core_validation"
 		};
 		const std::vector<const char*> wantedExtensions = {
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -83,6 +84,7 @@ namespace vkpbr {
 		std::vector<vk::Framebuffer>         framebuffers;
 		bool                                 swapchain_recreated;
 		uint32_t                             currentBuffer = 0;
+		bool                                 preparedToRender = false;
 
 		using FPScontainer = struct {
 			float fpsTimer = 0.0f;
@@ -103,20 +105,20 @@ namespace vkpbr {
 		DepthStencil depthStencil;
 
 
-		VkDebugReportCallbackEXT debugCallback;
-		
+		VkDebugUtilsMessengerEXT debugCallback;
 		static auto createDebugReportCallback(
 			vk::Instance instance,
-			const VkDebugReportCallbackCreateInfoEXT* create_info,
-			const VkAllocationCallbacks* allocator,
-			VkDebugReportCallbackEXT* callback
-		) -> VkResult;
+			const VkDebugUtilsMessengerCreateInfoEXT * create_info,
+			const VkAllocationCallbacks * allocator,
+			VkDebugUtilsMessengerEXT * callback
+		)->VkResult;
 		static auto destroyDebugReportCallback(
 			vk::Instance instance,
-			VkDebugReportCallbackEXT callback,
-			const VkAllocationCallbacks* allocator
+			VkDebugUtilsMessengerEXT callback,
+			const VkAllocationCallbacks * allocator
 		) -> void;
 		auto setupDebugCallback() -> void;
+
 		static auto windowResizeCallback(GLFWwindow* window, int width, int height) -> void;
 		auto recreateSwapchain() -> void;
 

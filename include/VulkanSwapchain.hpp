@@ -12,7 +12,7 @@ namespace vkpbr {
 	using SwapchainBuffer = struct {
 		vk::Image image;
 		vk::ImageView view;
-	} ;
+	};
 
 	class VulkanSwapchain {
 	public:
@@ -29,10 +29,10 @@ namespace vkpbr {
 		~VulkanSwapchain() = default;
 
 		auto initSurface(const Window& window) -> void;
-		auto attach(vk::Instance instance, vk::PhysicalDevice physicalDevice, vk::Device device, vkpbr::VulkanDevice::QueueFamilyIndices familyIndices) -> void;
+		auto attach(vk::Instance instance, vk::PhysicalDevice physical_device, vk::Device device, vkpbr::VulkanDevice::QueueFamilyIndices family_indices) -> void;
 		auto create(uint32_t& width, uint32_t& height) -> void;
-		auto acquireNextImage(vk::Semaphore imageAvailableSemaphore, uint32_t* imageIndex) const -> vk::Result;
-		auto presentToQueue(vk::Queue queue, uint32_t imageIndex, vk::Semaphore waitSemaphore) const -> vk::Result;
+		auto acquireNextImage(vk::Semaphore image_available_semaphore, uint32_t* image_index) const -> vk::Result;
+		auto presentToQueue(vk::Queue queue, uint32_t image_index, vk::Semaphore wait_semaphore) const -> vk::Result;
 		auto destroy() -> void;
 
 	private:
@@ -49,16 +49,13 @@ namespace vkpbr {
 		surface formats (pixel format, color space)
 		available presentation modes
 		*/
-		struct SwapchainSupportDetails
+		using SwapchainSupportDetails = struct
 		{
 			vk::SurfaceCapabilitiesKHR        capabilities;
 			std::vector<vk::SurfaceFormatKHR> formats;
 			std::vector<vk::PresentModeKHR>   presentModes;
-		} swapchainDetails;
+		};
 
-		auto querySwapchainSupport(vk::PhysicalDevice device) -> void;
-		auto chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats) const -> vk::SurfaceFormatKHR;
-		auto chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes) const -> vk::PresentModeKHR;
-		auto chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities) const -> vk::Extent2D;
+		SwapchainSupportDetails swapchainDetails;
 	};
 }
