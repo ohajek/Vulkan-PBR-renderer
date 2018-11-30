@@ -10,34 +10,18 @@
 class VKPBR : public VulkanRenderer
 {
 public:
-	VKPBR();
-
-	~VKPBR() override;
-
-	auto prepareForRender() -> void override;
-	auto setupPipelines() -> void;
-	auto setupDescriptors() -> void;
-	auto setupUniformBuffers() -> void;
-	auto updateUniformBuffers() -> void;
-	auto updateParameters() -> void;
-
-	auto render() -> void override;
-	auto renderGLTFNode(vkpbr::gltf::Node* node, vk::CommandBuffer, vkpbr::gltf::Material::AlphaMode alpha_mode) const -> void;
-	auto createCommandBuffers() -> void;
-	auto loadAssets() -> void;
-	auto setupNodeDescriptorSet(vkpbr::gltf::Node* node) const -> void;
-
+private:
 	using Textures = struct {
-		Texture2D empty;
-		Texture2D lutBRDF;
+		Texture2D      empty;
+		Texture2D      lutBRDF;
 		TextureCubemap environment;
 		TextureCubemap irradiance;
 		TextureCubemap prefiltered;
 	};
 
 	using Models = struct {
-		gltf::Model scene;
-		gltf::Model skybox;
+		vkpbr::gltf::Model scene;
+		vkpbr::gltf::Model skybox;
 	};
 
 	using Buffer = struct {
@@ -121,13 +105,38 @@ public:
 	vk::PipelineLayout        pipelineLayout;
 	float                     scale = 1.0f;
 	Camera                    camera;
-
-	bool      rotateModel = false;
-	glm::vec3 modelRotation = glm::vec3(0.0f);
-	glm::vec3 modelPosition = glm::vec3(0.0f);
+	bool                      rotateModel = false;
+	glm::vec3                 modelRotation = glm::vec3(0.0f);
+	glm::vec3                 modelPosition = glm::vec3(0.0f);
 
 	enum class PBRworkflow {
 		metallic_roughness = 0,
 		specular_glosiness = 1
 	};
+
+public:
+	VKPBR();
+
+	~VKPBR() override;
+
+	auto prepareForRender() -> void override;
+
+	auto loadAssets() -> void;
+
+	auto setupPipelines() -> void;
+
+	auto setupUniformBuffers() -> void;
+
+	auto updateUniformBuffers() -> void;
+
+	auto updateUniformParameters() -> void;
+
+	auto setupDescriptors() -> void;
+
+	auto setupCommandBuffers() -> void override;
+
+	auto renderModelNode(vkpbr::gltf::Node*               node, vk::CommandBuffer cmd_buffer,
+	                     vkpbr::gltf::Material::AlphaMode alpha_mode) const -> void;
+
+	auto render() -> void override;
 };
