@@ -3,10 +3,15 @@
 #include <memory>
 #include <chrono>
 
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
 #include <window.hpp>
 #include <VulkanDevice.hpp>
 #include <VulkanSwapchain.hpp>
+#include <Camera.hpp>
 #include <CustomException.hpp>
 
 using namespace vkpbr;
@@ -50,6 +55,8 @@ namespace vkpbr {
 		virtual auto prepareForRender() -> void;
 		virtual auto setupCommandBuffers() -> void;
 		virtual auto createFramebuffer() -> void;
+		virtual auto updateView() -> void;
+		virtual auto updateUI(uint32_t object_index) -> void;
 
 		auto setupWindow() -> void;
 		auto renderLoop() -> void;
@@ -85,6 +92,9 @@ namespace vkpbr {
 		bool                                 swapchain_recreated;
 		uint32_t                             currentBuffer = 0;
 		bool                                 preparedToRender = false;
+		vkpbr::Camera                        camera;
+		glm::vec3                            rotation = glm::vec3();
+		glm::vec3                            cameraPos = glm::vec3();
 
 		using FPScontainer = struct {
 			float fpsTimer = 0.0f;
@@ -104,6 +114,8 @@ namespace vkpbr {
 		};
 		DepthStencil depthStencil;
 
+		bool viewChanged = false;
+
 
 		VkDebugUtilsMessengerEXT debugCallback;
 		static auto createDebugReportCallback(
@@ -120,6 +132,8 @@ namespace vkpbr {
 		auto setupDebugCallback() -> void;
 
 		static auto windowResizeCallback(GLFWwindow* window, int width, int height) -> void;
+		static auto keyboardCallback(GLFWwindow* pWindow, int key, int scancode, int action, int mods) -> void;
+		auto keyPressed(GLFWwindow *window, int key, int scancode, int action, int mods) -> void;
 		auto recreateSwapchain() -> void;
 
 		auto selectPhysicalDevice() -> void;

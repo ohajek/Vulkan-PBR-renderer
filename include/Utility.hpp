@@ -97,7 +97,7 @@ inline auto loadShaderFromFile(vk::Device& device, const std::string& filename, 
 		module_create_info.codeSize = filesize;
 		module_create_info.pCode = reinterpret_cast<uint32_t*>(shader_code);
 
-		device.createShaderModule(&module_create_info, nullptr, &shader_stage_info.module);
+		VK_ASSERT(device.createShaderModule(&module_create_info, nullptr, &shader_stage_info.module));
 
 		delete[] shader_code;
 	}

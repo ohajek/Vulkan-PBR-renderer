@@ -163,7 +163,8 @@ auto VulkanSwapchain::create(uint32_t& width, uint32_t& height) -> void
 	create_info.minImageCount = swapchain_images_count;
 	create_info.imageFormat = colorFormat;
 	create_info.imageColorSpace = colorSpace;
-	create_info.imageExtent = vk::Extent2D { swapchain_extent.width, swapchain_extent.height };
+	create_info.imageExtent.width = width;
+	create_info.imageExtent.height = height;
 	create_info.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
 	create_info.preTransform = pre_transform;
 	create_info.imageArrayLayers = 1;

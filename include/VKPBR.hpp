@@ -3,38 +3,53 @@
 #include <VulkanRenderer.hpp>
 #include <VulkanTexture.hpp>
 #include <utility>
-#include <gltfModel.hpp>
-#include <Camera.hpp>
+#include <VulkanBuffer.hpp>
+#include "VulkanModel.hpp"
+
+
+#define VERTEX_BUFFER_BIND_ID 0
+#define GRID_DIM 7
+#define OBJ_DIM 0.05f
+
+
+struct Material {
+	using PushBlock = struct {
+		float roughness;
+		float metallic;
+		float r, g, b;
+	};
+	PushBlock parameters;
+	std::string name;
+
+	Material() {};
+
+	Material(const std::string& name, const glm::vec3 colour, const float roughness, const float metallic) : name(name) {
+		parameters.roughness = roughness;
+		parameters.metallic = metallic;
+		parameters.r = colour.r;
+		parameters.g = colour.g;
+		parameters.b = colour.b;
+	};
+};
 
 
 class VKPBR : public VulkanRenderer
 {
 public:
-private:
-	using Textures = struct {
-		Texture2D      empty;
-		Texture2D      lutBRDF;
-		TextureCubemap environment;
-		TextureCubemap irradiance;
-		TextureCubemap prefiltered;
-	};
+	vkpbr::VertexLayout vertexLayout = vkpbr::VertexLayout({
+		vkpbr::VertexComponent::position,
+		vkpbr::VertexComponent::normal,
+		vkpbr::VertexComponent::uv
+	});
 
-	using Models = struct {
-		vkpbr::gltf::Model scene;
-		vkpbr::gltf::Model skybox;
-	};
-
-	using Buffer = struct {
-		vk::Buffer               buffer;
-		vk::DeviceMemory         memory;
-		vk::DescriptorBufferInfo descriptor;
-		void*                    mappedMemory;
+	using Meshes = struct {
+		std::vector<vkpbr::Model> object;
+		int32_t objectIndex = 1;
 	};
 
 	using UniformBuffers = struct {
-		Buffer scene;
-		Buffer skybox;
-		Buffer parameters;
+		vkpbr::Buffer object;
+		vkpbr::Buffer parameters;
 	};
 
 	using UBOMatrices = struct {
@@ -42,77 +57,29 @@ private:
 		glm::mat4 view;
 		glm::mat4 projection;
 		glm::vec3 cameraPosition;
-		float     flipUV = 0.0f;
 	};
 
-	using UBOParameters = struct {
-		glm::vec4 lightDirection = {};
-		float     exposure = 4.5f;
-		float     gamma = 2.2f;
-		float     prefilteredMipLevels;
+	using UBOparams = struct {
+		glm::vec4 lights[4];
 	};
 
-	using Pipelines = struct {
-		vk::Pipeline skybox;
-		vk::Pipeline pbr;
-		vk::Pipeline pbrAlphaBlend;
-	};
+	Meshes models;
+	UniformBuffers uniformBuffers;
+	UBOMatrices uboMatrices;
+	UBOparams uboParams;
 
-	using DescriptorSetLayouts = struct {
-		vk::DescriptorSetLayout scene;
-		vk::DescriptorSetLayout material;
-		vk::DescriptorSetLayout node;
-	};
+	vk::PipelineLayout pipelineLayout;
+	vk::Pipeline pipeline;
+	vk::DescriptorSetLayout descriptorSetLayout;
+	vk::DescriptorSet descriptorSet;
 
-	using DescriptorSets = struct {
-		vk::DescriptorSet scene;
-		vk::DescriptorSet skybox;
-	};
+	/* Default materials */
+	std::vector<Material> materials;
+	int32_t materialIndex = 0;
+	std::vector<std::string> materialNames;
+	std::vector<std::string> objectNames;
 
-	using LightSource = struct {
-		glm::vec3 color = glm::vec3(1.0f);
-		glm::vec3 rotation = glm::vec3(75.0f, 40.0f, 0.0f);
-	};
-
-	using PushConstantBlockMaterial = struct {
-		glm::vec4 baseColorFactor;
-		glm::vec4 emissiveFactor;
-		glm::vec4 diffuseFactor;
-		glm::vec4 specularFactor;
-
-		float workflow;
-		float hasColorTexture;
-		float hasPhysicalDescriptorTexture;
-		float hasNormalTexture;
-		float hasOcclusionTexture;
-		float hasEmissiveTexture;
-		float metallicFactor;
-		float roughnessFactor;
-		float alphaMask;
-		float alphaMaskCutoff;
-	};
-
-	Textures                  textures;
-	Models                    models;
-	UniformBuffers            uniformBuffers;
-	UBOMatrices               uboMatrices;
-	UBOParameters             uboParameters;
-	Pipelines                 pipelines;
-	DescriptorSetLayouts      descriptorSetLayouts;
-	DescriptorSets            descriptorSets;
-	LightSource               lightSource;
-	PushConstantBlockMaterial pushConstantBlockMaterial;
-	vk::PipelineLayout        pipelineLayout;
-	float                     scale = 1.0f;
-	Camera                    camera;
-	bool                      rotateModel = false;
-	glm::vec3                 modelRotation = glm::vec3(0.0f);
-	glm::vec3                 modelPosition = glm::vec3(0.0f);
-
-	enum class PBRworkflow {
-		metallic_roughness = 0,
-		specular_glosiness = 1
-	};
+private:
 
 public:
 	VKPBR();
@@ -123,6 +90,8 @@ public:
 
 	auto loadAssets() -> void;
 
+	auto setupDescriptorSetLayout() -> void;
+
 	auto setupPipelines() -> void;
 
 	auto setupUniformBuffers() -> void;
@@ -131,12 +100,13 @@ public:
 
 	auto updateUniformParameters() -> void;
 
-	auto setupDescriptors() -> void;
+	auto setupDescriptorSets() -> void;
 
 	auto setupCommandBuffers() -> void override;
 
-	auto renderModelNode(vkpbr::gltf::Node*               node, vk::CommandBuffer cmd_buffer,
-	                     vkpbr::gltf::Material::AlphaMode alpha_mode) const -> void;
-
 	auto render() -> void override;
+
+	auto updateView() -> void override;
+
+	auto updateUI(uint32_t object_index) -> void override;
 };

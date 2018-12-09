@@ -233,7 +233,8 @@ auto VulkanRenderer::setupWindow() -> void
 	);
 
 	window.setUserPointer(this);
-	window.setKeyCallback(window::glfw::Window::windowKeyCallback);
+	//window.setKeyCallback(window::glfw::Window::windowKeyCallback);
+	window.setKeyCallback(keyboardCallback);
 	window.setResizeCallback(windowResizeCallback);
 }
 
@@ -251,7 +252,10 @@ auto VulkanRenderer::renderFrame() -> void
 {
 	const auto frame_start = std::chrono::high_resolution_clock::now();
 
-	//handle view change
+	if (viewChanged) {
+		viewChanged = false;
+		updateView();
+	}
 
 	render();
 	stopwatch.frameCounter++;
@@ -259,7 +263,12 @@ auto VulkanRenderer::renderFrame() -> void
 	const auto frame_end = std::chrono::high_resolution_clock::now();
 	const auto diff = std::chrono::duration<double, std::milli>(frame_end - frame_start).count();
 	stopwatch.delta = static_cast<float>(diff) / 1000.0f;
-	//update camera
+
+	/* Update camera */
+	camera.update(stopwatch.delta);
+	if (camera.isMoving()) {
+		viewChanged = true;
+	}
 
 	stopwatch.fpsTimer += static_cast<float>(diff);
 	if(stopwatch.fpsTimer > 1000.0f) {
@@ -267,6 +276,14 @@ auto VulkanRenderer::renderFrame() -> void
 		stopwatch.fpsTimer = 0.0f;
 		stopwatch.frameCounter = 0;
 	}
+}
+
+auto VulkanRenderer::updateView() -> void
+{
+}
+
+auto VulkanRenderer::updateUI(uint32_t object_index) -> void
+{
 }
 
 auto VulkanRenderer::prepareFrame() -> void
@@ -370,6 +387,57 @@ auto VulkanRenderer::recreateSwapchain() -> void
 	preparedToRender = true;
 }
 
+auto VulkanRenderer::keyboardCallback(GLFWwindow *window, int key, int scancode, int action, int mods) -> void
+{
+	auto renderer = reinterpret_cast<VulkanRenderer*>(glfwGetWindowUserPointer(window));
+	renderer->keyPressed(window, key, scancode, action, mods);
+}
+
+auto VulkanRenderer::keyPressed(GLFWwindow *window, int key, int scancode, int action, int mods) -> void
+{
+	switch (key) {
+	case GLFW_KEY_ESCAPE:
+		if (action == GLFW_PRESS)
+			glfwSetWindowShouldClose(window, true);
+		break;
+
+	case GLFW_KEY_W:
+		camera.keys.up = action;
+		break;
+
+	case GLFW_KEY_S:
+		camera.keys.down = action;
+		break;
+
+	case GLFW_KEY_A:
+		camera.keys.left = action;
+		break;
+
+	case GLFW_KEY_D:
+		camera.keys.right = action;
+		break;
+
+	case GLFW_KEY_1:
+		updateUI(0);
+		break;
+
+	case GLFW_KEY_2:
+		updateUI(1);
+		break;
+
+	case GLFW_KEY_3:
+		updateUI(2);
+		break;
+
+	case GLFW_KEY_4:
+		updateUI(3);
+		break;
+
+	default:
+		break;
+	}
+}
+
 auto VulkanRenderer::selectPhysicalDevice() -> void
 {
 	uint32_t device_count = 0;
@@ -438,6 +506,7 @@ auto VulkanRenderer::selectSuitableDepthFormat() -> void
 auto VulkanRenderer::createCommandBuffers() -> void
 {
 	drawCalls.resize(swapchain.imageCount);
+
 	vk::CommandBufferAllocateInfo buffer_allocate_info = {};
 	buffer_allocate_info.commandPool = commandPool;
 	buffer_allocate_info.level = vk::CommandBufferLevel::ePrimary;

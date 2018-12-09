@@ -7,7 +7,13 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace vkpbr {
+
 	class Camera {
+	private:
+		float fov;
+		float znear;
+		float zfar;
+
 	public:
 		glm::vec3 rotation = glm::vec3();
 		glm::vec3 position = glm::vec3();
@@ -22,17 +28,30 @@ namespace vkpbr {
 		};
 		Matrices matrices;
 
-		auto getNearPlane() -> float
+		using Keys = struct {
+			bool left = false;
+			bool right = false;
+			bool up = false;
+			bool down = false;
+		};
+		Keys keys;
+
+		auto isMoving() const -> bool
+		{
+			return keys.up | keys.down | keys.left | keys.right;
+		}
+
+		auto getNearPlane() const -> float
 		{
 			return znear;
 		}
 
-		auto getFarPlane() -> float
+		auto getFarPlane() const -> float
 		{
 			return zfar;
 		}
 
-		auto setPerspective(float fov, float aspect, float znear, float zfar) -> void
+		auto setPerspective(const float fov, const float aspect, const float znear, const float zfar) -> void
 		{
 			this->fov = fov;
 			this->znear = znear;
@@ -40,88 +59,81 @@ namespace vkpbr {
 			matrices.perspective = glm::perspective(glm::radians(fov), aspect, znear, zfar);
 		}
 
-		auto updateAspectRatio(float aspect)
+		auto updateAspectRatio(const float aspect)
 		{
 			matrices.perspective = glm::perspective(glm::radians(fov), aspect, znear, zfar);
 		}
 
-		auto setPosition(glm::vec3 position) -> void
+		auto setPosition(const glm::vec3 position) -> void
 		{
 			this->position = position;
 			updateView();
 		}
 
-		auto setRotation(glm::vec3 rotation) ->void
+		auto setRotation(const glm::vec3 rotation) ->void
 		{
 			this->rotation = rotation;
 			updateView();
 		}
 
-		auto rotate(glm::vec3 delta) -> void
+		auto rotate(const glm::vec3 delta) -> void
 		{
 			this->rotation += delta;
 			updateView();
 		}
 
-		auto setTranslation(glm::vec3 translation) -> void
+		auto setTranslation(const glm::vec3 translation) -> void
 		{
 			this->position = translation;
 			updateView();
 		}
 
-		auto translate(glm::vec3 delta) -> void
+		auto translate(const glm::vec3 delta) -> void
 		{
 			this->position += delta;
 			updateView();
 		}
 
-		auto update(float deltaTime) -> void
+		auto update(const float delta_time) -> void
 		{
 			updated = false;
 
-			auto front = glm::vec3{};
-			front.x = -cos(glm::radians(rotation.x)) * sin(glm::radians(rotation.y));
-			front.y = sin(glm::radians(rotation.x));
-			front.z = cos(glm::radians(rotation.x)) * cos(glm::radians(rotation.y));
-			front = glm::normalize(front);
+			if (isMoving()) {
+				auto front = glm::vec3{};
+				front.x = -cos(glm::radians(rotation.x)) * sin(glm::radians(rotation.y));
+				front.y = sin(glm::radians(rotation.x));
+				front.z = cos(glm::radians(rotation.x)) * cos(glm::radians(rotation.y));
+				front = glm::normalize(front);
 
-			const auto speed = movementSpeed * deltaTime;
+				const auto speed = movementSpeed * delta_time;
 
-			/* vyresit pohyb */
+				if (keys.up) {
+					position += front * speed;
+				}
+				if (keys.down) {
+					position -= front * speed;
+				}
+				if (keys.left) {
+					position -= glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * speed;
+				}
+				if (keys.right) {
+					position += glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * speed;
+				}
 
-			updateView();
+				updateView();
+			}
 		}
 
-
 	private:
-		float fov;
-		float znear;
-		float zfar;
-
 		auto updateView() -> void
 		{
 			auto rotation_matrix = glm::mat4(1.0f);
-			auto transformation_matrix = glm::mat4{};
 
-			rotation_matrix = glm::rotate(
-				rotation_matrix,
-				glm::radians(rotation.x),
-				glm::vec3(1.0f, 0.0f, 0.0f)
-			);
+			rotation_matrix = glm::rotate(rotation_matrix, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+			rotation_matrix = glm::rotate(rotation_matrix, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+			rotation_matrix = glm::rotate(rotation_matrix, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
 
-			rotation_matrix = glm::rotate(
-				rotation_matrix,
-				glm::radians(rotation.y),
-				glm::vec3(0.0f, 1.0f, 0.0f)
-			);
-
-			rotation_matrix = glm::rotate(
-				rotation_matrix,
-				glm::radians(rotation.z),
-				glm::vec3(0.0f, 0.0f, 1.0f)
-			);
-
-			transformation_matrix = glm::translate(glm::mat4(1.0f), position * glm::vec3(1.0f, 1.0f, -1.0f));
+			const auto transformation_matrix = glm::translate(glm::mat4(1.0f), position);
 
 			matrices.view = rotation_matrix * transformation_matrix;
 

@@ -8,6 +8,7 @@
 #include <vulkan/vulkan.hpp>
 
 #include <Utility.hpp>
+#include <VulkanBuffer.hpp>
 #include <CustomException.hpp>
 
 
@@ -213,6 +214,49 @@ namespace vkpbr
 
 			return vk::Result::eSuccess;
 		}
+
+		auto createBuffer(
+			const vk::DeviceSize size,
+			const vk::BufferUsageFlags usage_flags,
+			const vk::MemoryPropertyFlags property_flags,
+			vkpbr::Buffer& buffer,
+			void *data = nullptr) const -> void
+		{
+			buffer.device = logicalDevice;
+
+			vk::BufferCreateInfo buffer_create_info = {};
+			buffer_create_info.usage = usage_flags;
+			buffer_create_info.size = size;
+			VK_ASSERT(logicalDevice.createBuffer(&buffer_create_info, nullptr, &buffer.buffer));
+
+			vk::MemoryRequirements memory_requirements = {};
+			vk::MemoryAllocateInfo memory_allocate = {};
+			logicalDevice.getBufferMemoryRequirements(buffer.buffer, &memory_requirements);
+
+			memory_allocate.allocationSize = memory_requirements.size;
+			memory_allocate.memoryTypeIndex = findMemoryType(memory_requirements.memoryTypeBits, property_flags);
+			VK_ASSERT(logicalDevice.allocateMemory(&memory_allocate, nullptr, &buffer.memory));
+
+			buffer.alignment = memory_requirements.alignment;
+			buffer.size = memory_allocate.allocationSize;
+			buffer.usageFlags = usage_flags;
+			buffer.memoryPropertyFlags = property_flags;
+
+			/* If data have been passed, map buffer and copy them */
+			if (nullptr != data) {
+				VK_ASSERT(buffer.map());
+				memcpy(buffer.mapped, data, size);
+				if (!(property_flags & vk::MemoryPropertyFlagBits::eHostCoherent)) {
+					buffer.flush();
+				}
+				buffer.unmap();
+			}
+
+			buffer.setupDescriptor();
+
+			buffer.bind();
+		}
+
 
 		auto createLogicalDevice(
 			vk::PhysicalDeviceFeatures enabled_features,

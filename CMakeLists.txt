@@ -33,16 +33,18 @@ if (NOT CMAKE_VERSION VERSION_LESS 3.7.0)
 endif()
 
 
+
 # Windows
 IF(WIN32)
     #set libs path
     set(GLFW_LIBRARY ${CMAKE_SOURCE_DIR}/externals/glfw/ CACHE STRING "" FORCE)
+    set(ASSIMP_LIBRARY ${CMAKE_SOURCE_DIR}/externals/assimp/ CACHE STRING "" FORCE)
 
     #set libs
-    set(LIBS glfw3.lib)
+    set(LIBS glfw3.lib assimp-vc140-mt.lib)
 
     #include linker paths
-    link_directories(${GLFW_LIBRARY})
+    link_directories(${GLFW_LIBRARY} ${ASSIMP_LIBRARY})
 
 	#set executables
 	add_executable(${NAME} ${SOURCE_FILES} ${HEADER_FILES})
@@ -57,6 +59,7 @@ IF(WIN32)
         externals/glm
         externals/gli
         externals/glfw
+        externals/assimp
         ${Vulkan_INCLUDE_DIRS}
     )
 
