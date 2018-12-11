@@ -47,6 +47,9 @@ namespace window {
 			using resizeFunction = void(GLFWwindow*, int, int);
 			auto setResizeCallback(resizeFunction function) const -> void;
 
+			using mouseFunction = void(GLFWwindow*, double, double);
+			auto setMouseCallback(mouseFunction function) const -> void;
+
 			auto shoudlClose() const -> bool;
 
 			auto getSize(int& width, int& height) const -> void;

@@ -1,32 +1,30 @@
 #version 450
 
-layout (location = 0) in vec3 inPos;
+layout (location = 0) in vec3 inPosition;
 layout (location = 1) in vec3 inNormal;
 
-layout (binding = 0) uniform UBO 
-{
+layout (binding = 0) uniform UBO {
 	mat4 model;
 	mat4 view;
 	mat4 projection;
-	vec3 camPos;
+	vec3 cameraPosition;
 } ubo;
 
-layout (location = 0) out vec3 outWorldPos;
+layout (location = 0) out vec3 outWorldPosition;
 layout (location = 1) out vec3 outNormal;
 
-layout(push_constant) uniform PushConsts {
-	vec3 objPos;
-} pushConsts;
+layout(push_constant) uniform PushConstants {
+	vec3 objectPosition;
+} pushConstants;
 
-out gl_PerVertex 
-{
+out gl_PerVertex  {
 	vec4 gl_Position;
 };
 
+
 void main() 
 {
-	vec3 locPos = vec3(ubo.model * vec4(inPos, 1.0));
-	outWorldPos = locPos + pushConsts.objPos;
+	outWorldPosition = vec3(ubo.model * vec4(inPosition, 1.0f)) + pushConstants.objectPosition;
 	outNormal = mat3(ubo.model) * inNormal;
-	gl_Position = ubo.projection * ubo.view * vec4(outWorldPos, 1.0);
+	gl_Position = ubo.projection * ubo.view * vec4(outWorldPosition, 1.0);
 }

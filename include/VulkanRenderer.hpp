@@ -8,6 +8,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
+
 #include <window.hpp>
 #include <VulkanDevice.hpp>
 #include <VulkanSwapchain.hpp>
@@ -27,7 +28,7 @@ namespace vkpbr {
 
 	class VulkanRenderer {
 	public:
-		struct Settings {
+		using Settings = struct {
 			uint32_t 					width = 1280;
 			uint32_t 					height = 720;
 			bool						validation = false;
@@ -35,8 +36,22 @@ namespace vkpbr {
 			bool						vsync = false;
 			bool						multisampling = true;
 			vk::SampleCountFlagBits 	sampleCount = vk::SampleCountFlagBits::e4;
-		} settings;
-		const std::vector<const char*> wantedLayers = {
+		};
+
+		using FPScontainer = struct {
+			float    fpsTimer = 0.0f;
+			uint32_t frameCounter = 0;
+			uint32_t lastFPS = 0;
+			float    delta = 1.0f;
+		};
+
+		Settings                             settings;
+		glfw::Window                         window;
+		std::unique_ptr<vkpbr::VulkanDevice> vulkanDevice;
+		std::string                          programName;
+		std::string                          windowTitle;
+		vkpbr::Camera                        camera;
+		const std::vector<const char*>       wantedLayers = {
 			"VK_LAYER_LUNARG_standard_validation",
 			"VK_LAYER_LUNARG_assistant_layer",
 			"VK_LAYER_LUNARG_core_validation"
@@ -44,7 +59,9 @@ namespace vkpbr {
 		const std::vector<const char*> wantedExtensions = {
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME
 		};
-		glfw::Window window;
+		FPScontainer stopwatch;
+		glm::vec2    mousePosition;
+
 
 		VulkanRenderer();
 		virtual ~VulkanRenderer();
@@ -56,7 +73,7 @@ namespace vkpbr {
 		virtual auto setupCommandBuffers() -> void;
 		virtual auto createFramebuffer() -> void;
 		virtual auto updateView() -> void;
-		virtual auto updateUI(uint32_t object_index) -> void;
+		virtual auto updateUI() -> void;
 
 		auto setupWindow() -> void;
 		auto renderLoop() -> void;
@@ -68,14 +85,11 @@ namespace vkpbr {
 		auto setupSwapchain() -> void;
 	
 	protected:
-		std::string                          programName;
-		std::string                          windowTitle;
 		vk::Instance                         instance;
 		vk::PhysicalDevice                   physicalDevice;
 		vk::PhysicalDeviceProperties         deviceProperties;
 		vk::PhysicalDeviceFeatures           deviceFeatures;
 		vk::PhysicalDeviceMemoryProperties   deviceMemoryProperties;
-		std::unique_ptr<vkpbr::VulkanDevice> vulkanDevice;
 		vk::Device                           device;
 		vk::Queue                            queue;
 		vkpbr::VulkanSwapchain               swapchain;
@@ -92,17 +106,8 @@ namespace vkpbr {
 		bool                                 swapchain_recreated;
 		uint32_t                             currentBuffer = 0;
 		bool                                 preparedToRender = false;
-		vkpbr::Camera                        camera;
 		glm::vec3                            rotation = glm::vec3();
 		glm::vec3                            cameraPos = glm::vec3();
-
-		using FPScontainer = struct {
-			float fpsTimer = 0.0f;
-			uint32_t frameCounter = 0;
-			uint32_t lastFPS = 0;
-			float delta = 1.0f;
-		};
-		FPScontainer stopwatch; //TODO: stalo by za to prijit na lepsi jmeno
 
 		auto checkValidationLayerSupport() const -> bool;
 
@@ -112,12 +117,11 @@ namespace vkpbr {
 			vk::ImageView    view;
 			vk::DeviceMemory memory;
 		};
-		DepthStencil depthStencil;
 
-		bool viewChanged = false;
-
-
+		DepthStencil             depthStencil;
+		bool                     viewChanged = false;
 		VkDebugUtilsMessengerEXT debugCallback;
+
 		static auto createDebugReportCallback(
 			vk::Instance instance,
 			const VkDebugUtilsMessengerCreateInfoEXT * create_info,
@@ -132,7 +136,8 @@ namespace vkpbr {
 		auto setupDebugCallback() -> void;
 
 		static auto windowResizeCallback(GLFWwindow* window, int width, int height) -> void;
-		static auto keyboardCallback(GLFWwindow* pWindow, int key, int scancode, int action, int mods) -> void;
+		static auto keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mods) -> void;
+		static auto mouseCallback(GLFWwindow* window, double xpos, double ypos) -> void;
 		auto keyPressed(GLFWwindow *window, int key, int scancode, int action, int mods) -> void;
 		auto recreateSwapchain() -> void;
 

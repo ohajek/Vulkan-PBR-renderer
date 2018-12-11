@@ -1,6 +1,4 @@
 #include <VulkanRenderer.hpp>
-#include "Utility.hpp"
-#include <vulkan/vulkan.h>
 
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanDebugFunction(
@@ -233,9 +231,9 @@ auto VulkanRenderer::setupWindow() -> void
 	);
 
 	window.setUserPointer(this);
-	//window.setKeyCallback(window::glfw::Window::windowKeyCallback);
 	window.setKeyCallback(keyboardCallback);
 	window.setResizeCallback(windowResizeCallback);
+	window.setMouseCallback(mouseCallback);
 }
 
 auto VulkanRenderer::renderLoop() -> void
@@ -276,14 +274,17 @@ auto VulkanRenderer::renderFrame() -> void
 		stopwatch.fpsTimer = 0.0f;
 		stopwatch.frameCounter = 0;
 	}
+
+	updateUI();
 }
 
 auto VulkanRenderer::updateView() -> void
 {
 }
 
-auto VulkanRenderer::updateUI(uint32_t object_index) -> void
+auto VulkanRenderer::updateUI() -> void
 {
+
 }
 
 auto VulkanRenderer::prepareFrame() -> void
@@ -365,11 +366,15 @@ auto VulkanRenderer::recreateSwapchain() -> void
 	preparedToRender = false;
 	
 	device.waitIdle();
-	//new width and height
 	int new_width, new_height;
 	window.getSize(new_width, new_height);
 	settings.width = static_cast<uint32_t>(new_width);
 	settings.height = static_cast<uint32_t>(new_height);
+
+	if ((settings.width > 0.0f) && (settings.height > 0.0f)) {
+		camera.updateAspectRatio(static_cast<float>(settings.width) / static_cast<float>(settings.height));
+	}
+
 	setupSwapchain();
 	device.destroyImageView(depthStencil.view, nullptr);
 	device.destroyImage(depthStencil.image, nullptr);
@@ -418,24 +423,30 @@ auto VulkanRenderer::keyPressed(GLFWwindow *window, int key, int scancode, int a
 		break;
 
 	case GLFW_KEY_1:
-		updateUI(0);
+		updateUI();
 		break;
 
 	case GLFW_KEY_2:
-		updateUI(1);
+		updateUI();
 		break;
 
 	case GLFW_KEY_3:
-		updateUI(2);
+		updateUI();
 		break;
 
 	case GLFW_KEY_4:
-		updateUI(3);
+		updateUI();
 		break;
 
 	default:
 		break;
 	}
+}
+
+auto VulkanRenderer::mouseCallback(GLFWwindow* window, double xpos, double ypos) -> void
+{
+	auto renderer = reinterpret_cast<VulkanRenderer*>(glfwGetWindowUserPointer(window));
+	renderer->mousePosition = glm::vec2(xpos, ypos);
 }
 
 auto VulkanRenderer::selectPhysicalDevice() -> void

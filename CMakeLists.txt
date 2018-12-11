@@ -26,6 +26,21 @@ file(GLOB_RECURSE HEADER_FILES
     "include/*.hpp"
 )
 
+file(GLOB_RECURSE IMGUI_FILES
+    "externals/imgui/*.h"
+    "externals/imgui/*.hpp"
+    "externals/imgui/*.cpp"
+)
+
+file(GLOB_RECURSE SHADERS
+    "shaders/*.vert"
+    "shaders/*.frag"
+    "shaders/*.tesc"
+    "shaders/*.tese"
+    "shaders/*.geom"
+    "shaders/*.comp"
+)
+
 # Use FindVulkan module added with CMAKE 3.7
 if (NOT CMAKE_VERSION VERSION_LESS 3.7.0)
 	message(STATUS "Using module to find Vulkan")
@@ -47,7 +62,7 @@ IF(WIN32)
     link_directories(${GLFW_LIBRARY} ${ASSIMP_LIBRARY})
 
 	#set executables
-	add_executable(${NAME} ${SOURCE_FILES} ${HEADER_FILES})
+	add_executable(${NAME} ${SOURCE_FILES} ${HEADER_FILES} ${IMGUI_FILES} ${SHADERS})
 
     #link libraries
 	target_link_libraries(${NAME} ${LIBS} ${Vulkan_LIBRARY})
@@ -60,8 +75,15 @@ IF(WIN32)
         externals/gli
         externals/glfw
         externals/assimp
+        externals/imgui
         ${Vulkan_INCLUDE_DIRS}
     )
+
+    SOURCE_GROUP("imgui" FILES ${IMGUI_FILES})
+    set_target_properties(${NAME} PROPERTIES RESOURCE "${IMGUI_FILES}")
+
+    SOURCE_GROUP("Shaders" FILES ${SHADERS})
+    set_target_properties(${NAME} PROPERTIES RESOURCE "${SHADERS}")
 
 # Linux
 ELSE(WIN32)

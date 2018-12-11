@@ -42,8 +42,6 @@ inline std::string result_to_string(vk::Result value)
 	}
 }
 
-
-
 #define VK_ASSERT(f)																				\
 {																										\
 	vk::Result res = (f);																				\
@@ -106,4 +104,109 @@ inline auto loadShaderFromFile(vk::Device& device, const std::string& filename, 
 		exit(EXIT_FAILURE);
 	}
 	return shader_stage_info;
+}
+
+inline auto setImageLayout(
+	vk::CommandBuffer cmd_buffer,
+	vk::Image image,
+	vk::ImageLayout old_layout,
+	vk::ImageLayout new_layout,
+	vk::ImageSubresourceRange subresource_range,
+	vk::PipelineStageFlagBits src_stage_mask,
+	vk::PipelineStageFlagBits dst_stage_mask) -> void
+{
+	/* Memory barrier begin */
+	vk::ImageMemoryBarrier memory_barrier = {};
+	memory_barrier.oldLayout = old_layout;
+	memory_barrier.newLayout = new_layout;
+	memory_barrier.image = image;
+	memory_barrier.subresourceRange = subresource_range;
+
+	switch (old_layout) {
+	case vk::ImageLayout::eUndefined:
+		memory_barrier.srcAccessMask = static_cast<vk::AccessFlagBits>(0);
+		break;
+
+	case vk::ImageLayout::ePreinitialized:
+		memory_barrier.srcAccessMask = vk::AccessFlagBits::eHostWrite;
+		break;
+
+	case vk::ImageLayout::eColorAttachmentOptimal:
+		memory_barrier.srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+		break;
+
+	case vk::ImageLayout::eDepthStencilAttachmentOptimal:
+		memory_barrier.srcAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+		break;
+
+	case vk::ImageLayout::eTransferSrcOptimal:
+		memory_barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
+		break;
+
+	case vk::ImageLayout::eTransferDstOptimal:
+		memory_barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+		break;
+
+	case vk::ImageLayout::eShaderReadOnlyOptimal:
+		memory_barrier.srcAccessMask = vk::AccessFlagBits::eShaderRead;
+		break;
+
+	default:
+		break;
+	}
+
+	switch (new_layout) {
+	case vk::ImageLayout::eTransferDstOptimal:
+		memory_barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+		break;
+
+	case vk::ImageLayout::eTransferSrcOptimal:
+		memory_barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+		break;
+
+	case vk::ImageLayout::eColorAttachmentOptimal:
+		memory_barrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+		break;
+
+	case vk::ImageLayout::eDepthStencilAttachmentOptimal:
+		memory_barrier.dstAccessMask = memory_barrier.dstAccessMask | vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+		break;
+
+	case vk::ImageLayout::eShaderReadOnlyOptimal:
+		if (memory_barrier.srcAccessMask == static_cast<vk::AccessFlagBits>(0)) {
+			memory_barrier.srcAccessMask = vk::AccessFlagBits::eHostWrite | vk::AccessFlagBits::eTransferWrite;
+		}
+		memory_barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+		break;
+
+	default:
+		break;
+	}
+
+	cmd_buffer.pipelineBarrier(
+		src_stage_mask,
+		dst_stage_mask,
+		static_cast<vk::DependencyFlagBits>(0),
+		0,
+		nullptr,
+		0, nullptr,
+		1, &memory_barrier
+	);
+}
+
+inline auto setImageLayout(
+	vk::CommandBuffer cmd_buffer,
+	vk::Image image,
+	vk::ImageAspectFlags aspect_mask,
+	vk::ImageLayout old_layout,
+	vk::ImageLayout new_layout,
+	vk::PipelineStageFlagBits src_stage_mask,
+	vk::PipelineStageFlagBits dst_stage_mask) -> void
+{
+	vk::ImageSubresourceRange subresource_range = {};
+	subresource_range.aspectMask = aspect_mask;
+	subresource_range.baseMipLevel = 0;
+	subresource_range.levelCount = 1;
+	subresource_range.layerCount = 1;
+	setImageLayout(cmd_buffer, image, old_layout, new_layout, subresource_range, src_stage_mask, dst_stage_mask);
 }

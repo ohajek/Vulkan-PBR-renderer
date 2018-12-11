@@ -67,6 +67,7 @@ auto VKPBR::prepareForRender() -> void
 	setupUniformBuffers();
 	setupDescriptorSetLayout();
 	setupPipelines();
+	setupImGui();
 	setupDescriptorSets();
 	setupCommandBuffers();
 
@@ -87,18 +88,15 @@ auto VKPBR::loadAssets() -> void
 
 auto VKPBR::setupDescriptorSetLayout() -> void
 {
-	// TODO: mozna zmenit inicializaci
-	auto setLayoutBindings = std::vector<vk::DescriptorSetLayoutBinding>{
+	auto set_layout_bindings = std::vector<vk::DescriptorSetLayoutBinding>{
 		vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment),
 		vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment),
-		//(vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0),
-		//(vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eFragment, 1)
 	};
 
 
 	vk::DescriptorSetLayoutCreateInfo descriptor_layout = {};
-	descriptor_layout.pBindings = setLayoutBindings.data();
-	descriptor_layout.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
+	descriptor_layout.pBindings = set_layout_bindings.data();
+	descriptor_layout.bindingCount = static_cast<uint32_t>(set_layout_bindings.size());
 
 	VK_ASSERT(device.createDescriptorSetLayout(&descriptor_layout, nullptr, &descriptorSetLayout));
 
@@ -120,15 +118,13 @@ auto VKPBR::setupDescriptorSetLayout() -> void
 auto VKPBR::setupDescriptorSets() -> void
 {
 	/* First descriptor pool */
-	// TODO: mozna predelat init
-	auto poolSizes = std::vector<vk::DescriptorPoolSize>{
-		//(vk::DescriptorType::eUniformBuffer, 4),
+	auto pool_sizes = std::vector<vk::DescriptorPoolSize>{
 		vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 4),
 	};
 
 	vk::DescriptorPoolCreateInfo pool_create_info = {};
-	pool_create_info.pPoolSizes = poolSizes.data();
-	pool_create_info.poolSizeCount = poolSizes.size();
+	pool_create_info.pPoolSizes = pool_sizes.data();
+	pool_create_info.poolSizeCount = pool_sizes.size();
 	pool_create_info.maxSets = 2;
 
 	VK_ASSERT(device.createDescriptorPool(&pool_create_info, nullptr, &descriptorPool));
@@ -194,11 +190,9 @@ auto VKPBR::setupPipelines() -> void
 	vk::PipelineViewportStateCreateInfo viewport_state = {};
 	viewport_state.viewportCount = 1;
 	viewport_state.scissorCount = 1;
-	//TODO: flas = 0;
 
 	vk::PipelineMultisampleStateCreateInfo multisample_state = {};
 	multisample_state.rasterizationSamples = vk::SampleCountFlagBits::e1;
-	//todo: flags= 0;
 
 	auto dynamic_states = std::vector<vk::DynamicState> {
 		vk::DynamicState::eViewport,
@@ -207,7 +201,6 @@ auto VKPBR::setupPipelines() -> void
 	vk::PipelineDynamicStateCreateInfo dynamic_state;
 	dynamic_state.pDynamicStates = dynamic_states.data();
 	dynamic_state.dynamicStateCount = dynamic_states.size();
-	//todo :: flags
 
 	vk::GraphicsPipelineCreateInfo pipeline_create_info = {};
 	pipeline_create_info.layout = pipelineLayout;
@@ -307,6 +300,11 @@ auto VKPBR::updateUniformParameters() -> void
 	memcpy(uniformBuffers.parameters.mapped, &uboParams, sizeof(uboParams));
 }
 
+auto VKPBR::setupImGui() -> void
+{
+
+}
+
 auto VKPBR::setupCommandBuffers() -> void
 {
 	vk::CommandBufferBeginInfo buffer_begin_info = {};
@@ -358,34 +356,17 @@ auto VKPBR::setupCommandBuffers() -> void
 
 		auto material = materials[materialIndex];
 
-		/* Single row */
-		/*
-		material.parameters.metallic = 1.0f;
-
-		const uint32_t object_count = 10;
-		for (uint32_t j = 0; j < object_count; j++) {
-			glm::vec3 position = glm::vec3(float(j - (object_count / 2.0f)) * 2.5f, 0.0f, 0.0f);
-			material.parameters.roughness = glm::clamp(static_cast<float>(j) / static_cast<float>(object_count), 0.005f, 1.0f);
-
-			drawCalls[i].pushConstants(pipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::vec3), &position);
-			drawCalls[i].pushConstants(pipelineLayout, vk::ShaderStageFlagBits::eFragment, sizeof(glm::vec3), sizeof(Material::PushBlock), &material);
-			drawCalls[i].drawIndexed(models.object[models.objectIndex].indexCount, 1, 0, 0, 0);
-		}
-		*/
-
 		/* Grid */
 		for (uint32_t y = 0; y < GRID_DIM; y++) {
 			for (uint32_t x = 0; x < GRID_DIM; x++) {
 				glm::vec3 pos = glm::vec3(float(x - (GRID_DIM / 2.0f)) * 2.5f, 0.0f, float(y - (GRID_DIM / 2.0f)) * 2.5f);
 				drawCalls[i].pushConstants(pipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::vec3), &pos);
-				material.parameters.metallic = glm::clamp((float)x / (float)(GRID_DIM - 1), 0.1f, 1.0f);
-				material.parameters.roughness = glm::clamp((float)y / (float)(GRID_DIM - 1), 0.05f, 1.0f);
+				material.parameters.metallic = glm::clamp(static_cast<float>(x) / static_cast<float>(GRID_DIM - 1), 0.1f, 1.0f);
+				material.parameters.roughness = glm::clamp(static_cast<float>(y) / static_cast<float>(GRID_DIM - 1), 0.05f, 1.0f);
 				drawCalls[i].pushConstants(pipelineLayout, vk::ShaderStageFlagBits::eFragment, sizeof(glm::vec3), sizeof(Material::PushBlock), &material);
 				drawCalls[i].drawIndexed(models.object[models.objectIndex].indexCount, 1, 0, 0, 0);
 			}
 		}
-
-		// draw ui
 
 		drawCalls[i].endRenderPass();
 		drawCalls[i].end();
@@ -424,9 +405,8 @@ auto VKPBR::updateView() -> void
 	updateUniformBuffers();
 }
 
-auto VKPBR::updateUI(const uint32_t object_index) -> void
+auto VKPBR::updateUI() -> void
 {
-	models.objectIndex = object_index;
 	updateUniformBuffers();
 	setupCommandBuffers();
 }

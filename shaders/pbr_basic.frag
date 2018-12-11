@@ -1,23 +1,22 @@
 #version 450
 
-layout (location = 0) in vec3 inWorldPos;
+layout (location = 0) in vec3 inWorldPosition;
 layout (location = 1) in vec3 inNormal;
 
-layout (binding = 0) uniform UBO 
-{
+layout (binding = 0) uniform UBO {
 	mat4 model;
 	mat4 view;
 	mat4 projection;
-	vec3 camPos;
+	vec3 cameraPosition;
 } ubo;
 
-layout (binding = 1) uniform UBOShared {
+layout (binding = 1) uniform UBOparameters {
 	vec4 lights[4];
-} uboParams;
+} uboParameters;
 
 layout (location = 0) out vec4 outColor;
 
-layout(push_constant) uniform PushConsts {
+layout(push_constant) uniform PushConstants {
 	layout(offset = 12) float roughness;
 	layout(offset = 16) float metallic;
 	layout(offset = 20) float r;
@@ -25,104 +24,111 @@ layout(push_constant) uniform PushConsts {
 	layout(offset = 28) float b;
 } material;
 
-const float PI = 3.14159265359;
+const float pi = 3.14159265359;
 
-//#define ROUGHNESS_PATTERN 1
 
-vec3 materialcolor()
+// Returns albedo colour of location
+vec3 getAlbedo()
 {
 	return vec3(material.r, material.g, material.b);
 }
 
-// Normal Distribution function --------------------------------------
-float D_GGX(float dotNH, float roughness)
+// D component
+float chiGGX(float v)
 {
+    return v > 0 ? 1 : 0;
+}
+
+float DistributionGGX(vec3 N, vec3 H, float roughness)
+{
+    float NdotH = dot(N,H);
+	float NdotH2 = NdotH * NdotH;
 	float alpha = roughness * roughness;
 	float alpha2 = alpha * alpha;
-	float denom = dotNH * dotNH * (alpha2 - 1.0) + 1.0;
-	return (alpha2)/(PI * denom*denom); 
+	float denominator = NdotH2 * alpha2 + (1 - NdotH2);
+	   
+	return (chiGGX(NdotH) * alpha2) / ( pi * denominator * denominator );
 }
 
-// Geometric Shadowing function --------------------------------------
-float G_SchlicksmithGGX(float dotNL, float dotNV, float roughness)
+
+// F component 
+vec3 fresnelSchlick(float cosTheta, float metallic)
 {
-	float r = (roughness + 1.0);
-	float k = (r*r) / 8.0;
-	float GL = dotNL / (dotNL * (1.0 - k) + k);
-	float GV = dotNV / (dotNV * (1.0 - k) + k);
-	return GL * GV;
+	vec3 F0 = vec3(0.04); 
+	F0 = mix(F0, getAlbedo(), metallic);
+    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
-// Fresnel function ----------------------------------------------------
-vec3 F_Schlick(float cosTheta, float metallic)
+
+// G component
+float GeometrySchlickGGX(float NoV, float roughness)
 {
-	vec3 F0 = mix(vec3(0.04), materialcolor(), metallic); // * material.specular
-	vec3 F = F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0); 
-	return F;    
+    float r = (roughness + 1.0);
+    float k = (r*r) / 8.0;
+
+    float numerator   = NoV;
+    float denominator = NoV * (1.0 - k) + k;
+	
+    return numerator / denominator;
 }
 
-// Specular BRDF composition --------------------------------------------
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+{
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2  = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1  = GeometrySchlickGGX(NdotL, roughness);
+	
+    return ggx1 * ggx2;
+}
+
+
 
 vec3 BRDF(vec3 L, vec3 V, vec3 N, float metallic, float roughness)
 {
-	// Precalculate vectors and dot products	
-	vec3 H = normalize (V + L);
-	float dotNV = clamp(dot(N, V), 0.0, 1.0);
-	float dotNL = clamp(dot(N, L), 0.0, 1.0);
-	float dotLH = clamp(dot(L, H), 0.0, 1.0);
-	float dotNH = clamp(dot(N, H), 0.0, 1.0);
+	vec3 H = normalize(V + L);
+	
+	vec3 lightColour = vec3(1.0f);
+	vec3 colour = vec3(0.0f);
+  
+	float NdotV = clamp(dot(N, V), 0.0, 1.0);
+	float NdotL = clamp(dot(N, L), 0.0, 1.0);
 
-	// Light color fixed
-	vec3 lightColor = vec3(1.0);
+	if (NdotL > 0.0) {
+		// Cook-Torrance BRDF
+		float D = DistributionGGX(N, H, material.roughness);       
+		float G   = GeometrySmith(N, V, L, material.roughness);
+		vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), metallic);       
 
-	vec3 color = vec3(0.0);
+		vec3 specular = D * F * G / (4.0f * NdotL * NdotV);    
 
-	if (dotNL > 0.0)
-	{
-		float rroughness = max(0.05, roughness);
-		// D = Normal distribution (Distribution of the microfacets)
-		float D = D_GGX(dotNH, roughness); 
-		// G = Geometric shadowing term (Microfacets shadowing)
-		float G = G_SchlicksmithGGX(dotNL, dotNV, roughness);
-		// F = Fresnel factor (Reflectance depending on angle of incidence)
-		vec3 F = F_Schlick(dotNV, metallic);
-
-		vec3 spec = D * F * G / (4.0 * dotNL * dotNV);
-
-		color += spec * dotNL * lightColor;
+		colour += specular * NdotL * lightColour;
 	}
 
-	return color;
+	return colour;
 }
 
-// ----------------------------------------------------------------------------
+
 void main()
 {		  
 	vec3 N = normalize(inNormal);
-	vec3 V = normalize(ubo.camPos - inWorldPos);
+	vec3 V = normalize(ubo.cameraPosition - inWorldPosition);
+	vec3 F0 = vec3(0.04); 
+    F0 = mix(F0, getAlbedo(), material.metallic);
 
-	float roughness = material.roughness;
+	// Solve reflectance function
+	vec3 Lo = vec3(0.0f);
+	for (int i = 0; i < uboParameters.lights.length(); i++) {
+		vec3 L = normalize(uboParameters.lights[i].xyz - inWorldPosition);
+		Lo += BRDF(L, V, N, material.metallic, material.roughness);
+	}
 
-	// Add striped pattern to roughness based on vertex position
-#ifdef ROUGHNESS_PATTERN
-	roughness = max(roughness, step(fract(inWorldPos.y * 2.02), 0.5));
-#endif
+	vec3 color = vec3(0.03) * getAlbedo();
+	color += Lo;  
 
-	// Specular contribution
-	vec3 Lo = vec3(0.0);
-	for (int i = 0; i < uboParams.lights.length(); i++) {
-		vec3 L = normalize(uboParams.lights[i].xyz - inWorldPos);
-		Lo += BRDF(L, V, N, material.metallic, roughness);
-	};
+	// Gamma correction
+	color = color / (color + vec3(1.0f));
+	color = pow(color, vec3(1.0f / 2.2f)); 
 
-	// Combine with ambient
-	vec3 color = materialcolor() * 0.02;
-	color += Lo;
-
-	// Gamma correct
-	color = color / (color + vec3(1.0));
-	color = pow(color, vec3(1.0/2.2)); 
-
-
-	outColor = vec4(color, 1.0);
+	outColor = vec4(color, 1.0f);
 }

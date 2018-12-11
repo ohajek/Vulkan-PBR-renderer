@@ -1,11 +1,12 @@
 #pragma once
 
+#include <algorithm>
+
 #include <VulkanRenderer.hpp>
 #include <VulkanTexture.hpp>
 #include <utility>
 #include <VulkanBuffer.hpp>
 #include "VulkanModel.hpp"
-
 
 #define VERTEX_BUFFER_BIND_ID 0
 #define GRID_DIM 7
@@ -31,7 +32,6 @@ struct Material {
 		parameters.b = colour.b;
 	};
 };
-
 
 class VKPBR : public VulkanRenderer
 {
@@ -63,19 +63,19 @@ public:
 		glm::vec4 lights[4];
 	};
 
-	Meshes models;
+	Meshes         models;
 	UniformBuffers uniformBuffers;
-	UBOMatrices uboMatrices;
-	UBOparams uboParams;
+	UBOMatrices    uboMatrices;
+	UBOparams      uboParams;
 
-	vk::PipelineLayout pipelineLayout;
-	vk::Pipeline pipeline;
+	vk::PipelineLayout      pipelineLayout;
+	vk::Pipeline            pipeline;
 	vk::DescriptorSetLayout descriptorSetLayout;
-	vk::DescriptorSet descriptorSet;
+	vk::DescriptorSet       descriptorSet;
 
 	/* Default materials */
-	std::vector<Material> materials;
-	int32_t materialIndex = 0;
+	std::vector<Material>    materials;
+	int32_t                  materialIndex = 0;
 	std::vector<std::string> materialNames;
 	std::vector<std::string> objectNames;
 
@@ -100,6 +100,8 @@ public:
 
 	auto updateUniformParameters() -> void;
 
+	auto setupImGui() -> void;
+
 	auto setupDescriptorSets() -> void;
 
 	auto setupCommandBuffers() -> void override;
@@ -108,5 +110,5 @@ public:
 
 	auto updateView() -> void override;
 
-	auto updateUI(uint32_t object_index) -> void override;
+	auto updateUI() -> void override;
 };

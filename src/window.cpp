@@ -49,6 +49,11 @@ auto Window::setResizeCallback(resizeFunction function) const -> void
 	glfwSetWindowSizeCallback(windowPointer.get(), function);
 }
 
+auto Window::setMouseCallback(mouseFunction function) const -> void
+{
+	glfwSetCursorPosCallback(windowPointer.get(), function);
+}
+
 auto Window::shoudlClose() const -> bool
 {
 	return glfwWindowShouldClose(windowPointer.get());
