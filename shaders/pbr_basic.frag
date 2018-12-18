@@ -100,7 +100,7 @@ vec3 BRDF(vec3 L, vec3 V, vec3 N, float metallic, float roughness)
 		float G   = GeometrySmith(N, V, L, material.roughness);
 		vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), metallic);       
 
-		vec3 specular = D * F * G / (4.0f * NdotL * NdotV);    
+		vec3 specular = (D * F * G) / (4.0f * NdotL * NdotV);    
 
 		colour += specular * NdotL * lightColour;
 	}
