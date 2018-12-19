@@ -5,7 +5,7 @@
 auto main() -> int
 {
 	try {
-		auto renderer = std::make_unique<VKPBR>();
+		auto renderer = std::make_unique<GMU>();
 		renderer->setupWindow();
 		renderer->initVulkan();
 		renderer->prepareForRender();

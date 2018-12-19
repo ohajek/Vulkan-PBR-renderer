@@ -7,102 +7,98 @@
 #include "VulkanModel.hpp"
 
 
-#define VERTEX_BUFFER_BIND_ID 0
-#define GRID_DIM 7
-#define OBJ_DIM 0.05f
 
-
-struct Material {
-	using PushBlock = struct {
-		float roughness;
-		float metallic;
-		float r, g, b;
-	};
-	PushBlock parameters;
-	std::string name;
-
-	Material() {};
-
-	Material(const std::string& name, const glm::vec3 colour, const float roughness, const float metallic) : name(name) {
-		parameters.roughness = roughness;
-		parameters.metallic = metallic;
-		parameters.r = colour.r;
-		parameters.g = colour.g;
-		parameters.b = colour.b;
-	};
+struct Vertex {
+	//float pos[3];
+	//float uv[2];
+	glm::vec3 position;
+	glm::vec2 uv;
 };
 
 
-class VKPBR : public VulkanRenderer
-{
-public:
-	vkpbr::VertexLayout vertexLayout = vkpbr::VertexLayout({
-		vkpbr::VertexComponent::position,
-		vkpbr::VertexComponent::normal,
-		vkpbr::VertexComponent::uv
-	});
-
-	using Meshes = struct {
-		std::vector<vkpbr::Model> object;
-		int32_t objectIndex = 1;
-	};
-
-	using UniformBuffers = struct {
-		vkpbr::Buffer object;
-		vkpbr::Buffer parameters;
-	};
-
-	using UBOMatrices = struct {
-		glm::mat4 model;
-		glm::mat4 view;
-		glm::mat4 projection;
-		glm::vec3 cameraPosition;
-	};
-
-	using UBOparams = struct {
-		glm::vec4 lights[4];
-	};
-
-	Meshes models;
-	UniformBuffers uniformBuffers;
-	UBOMatrices uboMatrices;
-	UBOparams uboParams;
-
-	vk::PipelineLayout pipelineLayout;
-	vk::Pipeline pipeline;
-	vk::DescriptorSetLayout descriptorSetLayout;
-	vk::DescriptorSet descriptorSet;
-
-	/* Default materials */
-	std::vector<Material> materials;
-	int32_t materialIndex = 0;
-	std::vector<std::string> materialNames;
-	std::vector<std::string> objectNames;
-
+class GMU : public VulkanRenderer
+{	
 private:
+	vkpbr::Texture2D      colorMap;
+	vkpbr::Texture2D      computeTarget;
+	vkpbr::TextureCubemap cubeTarget;
 
 public:
-	VKPBR();
 
-	~VKPBR() override;
+	using Vertices = struct {
+		vk::PipelineVertexInputStateCreateInfo           inputState;
+		std::vector<vk::VertexInputBindingDescription>   bindingDescriptions;
+		std::vector<vk::VertexInputAttributeDescription> attributeDescriptions;
+	};
+
+	using GraphicsResources = struct {
+		vk::Pipeline            pipeline;
+		vk::PipelineLayout      pipelineLayout;
+		vk::DescriptorSetLayout descriptorSetLayout;
+		vk::DescriptorSet       descriptorSetPreCompute;
+		vk::DescriptorSet       descriptorSetPostCompute;
+	};
+
+	using ComputeResources = struct {
+		std::vector<vk::Pipeline> pipelines;
+		vk::PipelineLayout        pipelineLayout;
+		uint32_t                  pipelineIndex = 0;
+		uint32_t                  graphicsFamilyIndex; // family index of graphics queue -> for barriers
+		vk::DescriptorSetLayout   descriptorSetLayout;
+		vk::DescriptorSet         descriptorSet;
+		vk::Fence                 fence; // to avoid writing to command buffer if its in use
+		vk::Queue                 queue;
+		vk::CommandPool           commandPool;
+		vk::CommandBuffer         commandBuffer;
+	};
+
+	using UBOmatrices = struct {
+		glm::mat4 model;
+		glm::mat4 projection;
+	};
+
+
+	Vertices                 vertices;
+	GraphicsResources        graphicsResources;
+	ComputeResources         computeResources;
+	vkpbr::Buffer            vertexBuffer;
+	uint32_t                 vertexBufferSize;
+	vkpbr::Buffer            indexBuffer;
+	uint32_t                 indexCount;
+	vkpbr::Buffer            uniformBuffer;
+	UBOmatrices              uboMatrices;
+	std::vector<std::string> shaderNames;
+
+
+	GMU();
+
+	~GMU() override;
 
 	auto prepareForRender() -> void override;
 
 	auto loadAssets() -> void;
+	auto generateQuad() -> void;
+	auto setupVertexDescriptions() -> void;
 
 	auto setupDescriptorSetLayout() -> void;
 
 	auto setupPipelines() -> void;
+	auto setupDescriptorPool() -> void;
 
 	auto setupUniformBuffers() -> void;
 
 	auto updateUniformBuffers() -> void;
+	auto setupTextureTarget(vkpbr::Texture* tex, uint32_t width, uint32_t height, vk::Format format) -> void;
 
 	auto updateUniformParameters() -> void;
 
 	auto setupDescriptorSets() -> void;
+	auto setupComputePipeline() -> void;
+	auto findComputeQueue() -> void;
+	auto setupComputeCommandBuffer() -> void;
 
 	auto setupCommandBuffers() -> void override;
+	auto checkCmdBuffers() -> bool;
 
 	auto render() -> void override;
 

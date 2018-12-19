@@ -7,164 +7,269 @@
 #include "tiny_gltf.h"
 
 
-VKPBR::VKPBR()
+GMU::GMU()
 {
-	windowTitle = "PGP PBR Renderer";
-
-	camera.setPosition({ 10.0f, 13.0f, 1.8f });
-	camera.setRotation({ -62.5f, 90.0f, 0.0f });
-	camera.rotationSpeed = 0.25;
-	camera.movementSpeed = 4.0f;
-	camera.setPerspective(
-		60.0f,
-		static_cast<float>(settings.width) / static_cast<float>(settings.height),
-		0.1f,
-		256.0f
-	);
-	
-	/* https://seblagarde.wordpress.com/2011/08/17/feeding-a-physical-based-lighting-mode/ */
-	materials.push_back(Material("Gold", glm::vec3(1.0f, 0.765557f, 0.336057f), 0.1f, 1.0f));
-	materials.push_back(Material("Copper", glm::vec3(0.955008f, 0.637427f, 0.538163f), 0.1f, 1.0f));
-	materials.push_back(Material("Chromium", glm::vec3(0.549585f, 0.556114f, 0.554256f), 0.1f, 1.0f));
-	materials.push_back(Material("Nickel", glm::vec3(0.659777f, 0.608679f, 0.525649f), 0.1f, 1.0f));
-	materials.push_back(Material("Titanium", glm::vec3(0.541931f, 0.496791f, 0.449419f), 0.1f, 1.0f));
-	materials.push_back(Material("Cobalt", glm::vec3(0.662124f, 0.654864f, 0.633732f), 0.1f, 1.0f));
-	materials.push_back(Material("Platinum", glm::vec3(0.672411f, 0.637331f, 0.585456f), 0.1f, 1.0f));
-	
-	/* Testing materials */
-	materials.push_back(Material("White", glm::vec3(1.0f), 0.1f, 1.0f));
-	materials.push_back(Material("Red", glm::vec3(1.0f, 0.0f, 0.0f), 0.1f, 1.0f));
-	materials.push_back(Material("Blue", glm::vec3(0.0f, 0.0f, 1.0f), 0.1f, 1.0f));
-	materials.push_back(Material("Black", glm::vec3(0.0f), 0.1f, 1.0f));
-	
-	for (auto material : materials) {
-		materialNames.push_back(material.name);
-	}
-	objectNames = { "Sphere", "Teapot", "Torusknot", "Venus" };
-
-	materialIndex = 2;
+	windowTitle = "GMU PBR compute";
 }
 
-VKPBR::~VKPBR()
+GMU::~GMU()
 {
-	device.destroyPipeline(pipeline, nullptr);
 
-	device.destroyPipelineLayout(pipelineLayout, nullptr);
-	device.destroyDescriptorSetLayout(descriptorSetLayout, nullptr);
-
-	for (auto& model : models.object) {
-		model.destroy();
-	}
-
-	uniformBuffers.object.destroy();
-	uniformBuffers.parameters.destroy();
 }
 
-auto VKPBR::prepareForRender() -> void
+auto GMU::prepareForRender() -> void
 {
 	VulkanRenderer::prepareForRender();
 	loadAssets();
+	generateQuad();
+	setupVertexDescriptions();
 	setupUniformBuffers();
+	setupTextureTarget(&computeTarget, colorMap.width, colorMap.height, vk::Format::eR8G8B8A8Unorm);
 	setupDescriptorSetLayout();
 	setupPipelines();
+	setupDescriptorPool();
 	setupDescriptorSets();
+	setupComputePipeline();
 	setupCommandBuffers();
 
 	preparedToRender = true;
 }
 
-auto VKPBR::loadAssets() -> void
+auto GMU::loadAssets() -> void
 {
-	auto filenames = std::vector<std::string>{ "geosphere.obj", "teapot.dae", "venus.fbx", "torusknot.obj" };
-	std::string& resource_dir = std::string(RESOURCE_DIR);
-	for (const auto& file : filenames) {
-		vkpbr::Model model;
-		auto path = std::string(resource_dir + "models/" + file);
-		model.loadFromFile(path, vertexLayout, OBJ_DIM * (file == "venus.fbx" ? 3.0f : 1.0f), vulkanDevice.get(), queue);
-		models.object.push_back(model);
-	}	
+	const auto resource_path = std::string(RESOURCE_DIR);
+	colorMap.loadFromFile(
+		resource_path + "textures/vulkan.ktx",
+		vk::Format::eR8G8B8A8Unorm,
+		vulkanDevice.get(),
+		queue, vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage,
+		vk::ImageLayout::eGeneral
+	);
 }
 
-auto VKPBR::setupDescriptorSetLayout() -> void
+auto GMU::generateQuad() -> void
 {
-	// TODO: mozna zmenit inicializaci
-	auto setLayoutBindings = std::vector<vk::DescriptorSetLayoutBinding>{
-		vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment),
-		vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment),
-		//(vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0),
-		//(vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eFragment, 1)
+	auto  vertices = std::vector<Vertex> {
+		Vertex { glm::vec3(-1.0f, 1.0f, 0.0f),	glm::vec2(0.0f, 1.0f) },
+		Vertex { glm::vec3(1.0f, 1.0f, 0.0f),	glm::vec2(1.0f, 1.0f) },
+		Vertex { glm::vec3(1.0f, -1.0f, 0.0f),	glm::vec2(1.0f, 0.0f) },
+		Vertex { glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec2(0.0f, 0.0f) },
 	};
 
+	auto indices = std::vector<uint32_t>{ 0, 1, 2,  2, 3, 0 };
+	indexCount = indices.size();
 
-	vk::DescriptorSetLayoutCreateInfo descriptor_layout = {};
+	/* Vertex buffer */
+	vulkanDevice->createBuffer(
+		vertices.size() * sizeof(Vertex),
+		vk::BufferUsageFlagBits::eVertexBuffer,
+		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+		vertexBuffer,
+		vertices.data()
+	);
+
+	/* Index buffer */
+	vulkanDevice->createBuffer(
+		indices.size() * sizeof(uint32_t),
+		vk::BufferUsageFlagBits::eIndexBuffer,
+		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+		indexBuffer,
+		indices.data()
+	);
+}
+
+auto GMU::setupVertexDescriptions() -> void
+{
+	/* Vertex binding */
+	vk::VertexInputBindingDescription binding_description = {};
+	binding_description.binding = 0;
+	binding_description.stride = sizeof(Vertex);
+	binding_description.inputRate = vk::VertexInputRate::eVertex;
+
+	vertices.bindingDescriptions.push_back(binding_description);
+
+	/* Attributes */
+	vk::VertexInputAttributeDescription position_attribute = {};
+	position_attribute.binding = 0;
+	position_attribute.location = 0;
+	position_attribute.format = vk::Format::eR32G32B32Sfloat;
+	position_attribute.offset = offsetof(Vertex, position);
+
+	vk::VertexInputAttributeDescription uv_attribute = {};
+	uv_attribute.binding = 0;
+	uv_attribute.location = 1;
+	uv_attribute.format = vk::Format::eR32G32Sfloat;
+	uv_attribute.offset = offsetof(Vertex, uv);
+
+	vertices.attributeDescriptions.push_back(position_attribute);
+	vertices.attributeDescriptions.push_back(uv_attribute);
+
+	/* Assign to vertex buffer */
+	vk::PipelineVertexInputStateCreateInfo input_state = {};
+	input_state.vertexBindingDescriptionCount = vertices.bindingDescriptions.size();
+	input_state.pVertexBindingDescriptions = vertices.bindingDescriptions.data();
+	input_state.vertexAttributeDescriptionCount = vertices.attributeDescriptions.size();
+	input_state.pVertexAttributeDescriptions = vertices.attributeDescriptions.data();
+	vertices.inputState = input_state;
+}
+
+auto GMU::setupDescriptorSetLayout() -> void
+{
+	auto setLayoutBindings = std::vector<vk::DescriptorSetLayoutBinding>{
+		vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex),
+		vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment),
+	};
+
+	auto descriptor_layout = vk::DescriptorSetLayoutCreateInfo{};
 	descriptor_layout.pBindings = setLayoutBindings.data();
 	descriptor_layout.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
+	VK_ASSERT(device.createDescriptorSetLayout(&descriptor_layout, nullptr, &graphicsResources.descriptorSetLayout));
 
-	VK_ASSERT(device.createDescriptorSetLayout(&descriptor_layout, nullptr, &descriptorSetLayout));
-
-	vk::PipelineLayoutCreateInfo pipeline_layout_create_info = {};
-	pipeline_layout_create_info.pSetLayouts = &descriptorSetLayout;
-	pipeline_layout_create_info.setLayoutCount = 1;
-
-	auto push_constant_ranges = std::vector<vk::PushConstantRange>{
-		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::vec3)),
-		vk::PushConstantRange(vk::ShaderStageFlagBits::eFragment, sizeof(glm::vec3), sizeof(Material::PushBlock))
-	};
-
-	pipeline_layout_create_info.pushConstantRangeCount = 2;
-	pipeline_layout_create_info.pPushConstantRanges = push_constant_ranges.data();
-
-	VK_ASSERT(device.createPipelineLayout(&pipeline_layout_create_info, nullptr, &pipelineLayout));
+	auto pipeline_layout_info = vk::PipelineLayoutCreateInfo{};
+	pipeline_layout_info.pSetLayouts = &graphicsResources.descriptorSetLayout;
+	pipeline_layout_info.setLayoutCount = 1;
+	VK_ASSERT(device.createPipelineLayout(&pipeline_layout_info, nullptr, &graphicsResources.pipelineLayout));
 }
 
-auto VKPBR::setupDescriptorSets() -> void
+auto GMU::setupDescriptorSets() -> void
 {
-	/* First descriptor pool */
-	// TODO: mozna predelat init
-	auto poolSizes = std::vector<vk::DescriptorPoolSize>{
-		//(vk::DescriptorType::eUniformBuffer, 4),
-		vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 4),
-	};
-
-	vk::DescriptorPoolCreateInfo pool_create_info = {};
-	pool_create_info.pPoolSizes = poolSizes.data();
-	pool_create_info.poolSizeCount = poolSizes.size();
-	pool_create_info.maxSets = 2;
-
-	VK_ASSERT(device.createDescriptorPool(&pool_create_info, nullptr, &descriptorPool));
-
-	/* Descriptor sets */
 	vk::DescriptorSetAllocateInfo allocate_info = {};
 	allocate_info.descriptorPool = descriptorPool;
-	allocate_info.pSetLayouts = &descriptorSetLayout;
+	allocate_info.pSetLayouts = &graphicsResources.descriptorSetLayout;
 	allocate_info.descriptorSetCount = 1;
-	
-	/* 3D object desc. set */
-	VK_ASSERT(device.allocateDescriptorSets(&allocate_info, &descriptorSet));
 
-	vk::WriteDescriptorSet object_set = {};
-	object_set.dstSet = descriptorSet;
-	object_set.descriptorType = vk::DescriptorType::eUniformBuffer;
-	object_set.dstBinding = 0;
-	object_set.pBufferInfo = &uniformBuffers.object.descriptor;
-	object_set.descriptorCount = 1;
+	/* Input image before compute */
+	VK_ASSERT(device.allocateDescriptorSets(&allocate_info, &graphicsResources.descriptorSetPreCompute));
 
-	vk::WriteDescriptorSet parameters_set = {};
-	parameters_set.dstSet = descriptorSet;
-	parameters_set.descriptorType = vk::DescriptorType::eUniformBuffer;
-	parameters_set.dstBinding = 1;
-	parameters_set.pBufferInfo = &uniformBuffers.parameters.descriptor;
-	parameters_set.descriptorCount = 1;
-
-	auto write_descriptor_sets = std::vector<vk::WriteDescriptorSet>{
-		object_set,
-		parameters_set
+	auto base_image_write_descriptor_sets = std::vector<vk::WriteDescriptorSet>{
+		createWriteDescriptorSet(graphicsResources.descriptorSetPreCompute, vk::DescriptorType::eUniformBuffer, 0, &uniformBuffer.descriptor),
+		createWriteDescriptorSet(graphicsResources.descriptorSetPreCompute, vk::DescriptorType::eCombinedImageSampler, 1, &colorMap.descriptorInfo),
 	};
+	device.updateDescriptorSets(base_image_write_descriptor_sets.size(), base_image_write_descriptor_sets.data(), 0, nullptr);
 
-	device.updateDescriptorSets(static_cast<uint32_t>(write_descriptor_sets.size()), write_descriptor_sets.data(), 0, nullptr);
+	/* Image after compute shader processing */
+	VK_ASSERT(device.allocateDescriptorSets(&allocate_info, &graphicsResources.descriptorSetPostCompute));
+	auto write_descriptor_sets = std::vector<vk::WriteDescriptorSet>{
+		createWriteDescriptorSet(graphicsResources.descriptorSetPostCompute, vk::DescriptorType::eUniformBuffer, 0, &uniformBuffer.descriptor),
+		createWriteDescriptorSet(graphicsResources.descriptorSetPostCompute, vk::DescriptorType::eCombinedImageSampler, 1, &computeTarget.descriptorInfo),
+	};
+	device.updateDescriptorSets(write_descriptor_sets.size(), write_descriptor_sets.data(), 0, nullptr);
 }
 
-auto VKPBR::setupPipelines() -> void
+auto GMU::setupComputePipeline() -> void
+{
+	findComputeQueue();
+
+
+	auto set_layout_bindings = std::vector<vk::DescriptorSetLayoutBinding>{
+		vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageImage, 1, vk::ShaderStageFlagBits::eCompute), // Binding 0: input image RO
+		vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageImage, 1, vk::ShaderStageFlagBits::eCompute), // Binding 1: output image WRITE
+	};
+
+	auto descriptor_layout = vk::DescriptorSetLayoutCreateInfo{};
+	descriptor_layout.pBindings = set_layout_bindings.data();
+	descriptor_layout.bindingCount = set_layout_bindings.size();
+
+	VK_ASSERT(device.createDescriptorSetLayout(&descriptor_layout, nullptr, &computeResources.descriptorSetLayout));
+
+	
+	auto pipeline_layout_create_info = vk::PipelineLayoutCreateInfo{};
+	pipeline_layout_create_info.pSetLayouts = &computeResources.descriptorSetLayout;
+	pipeline_layout_create_info.setLayoutCount = 1;
+
+	VK_ASSERT(device.createPipelineLayout(&pipeline_layout_create_info, nullptr, &computeResources.pipelineLayout));
+
+
+	auto allocate_info = vk::DescriptorSetAllocateInfo{};
+	allocate_info.descriptorPool = descriptorPool;
+	allocate_info.pSetLayouts = &computeResources.descriptorSetLayout;
+	allocate_info.descriptorSetCount = 1;
+
+	VK_ASSERT(device.allocateDescriptorSets(&allocate_info, &computeResources.descriptorSet));
+
+
+	auto compute_write_descriptor_sets = std::vector<vk::WriteDescriptorSet>{
+		createWriteDescriptorSet(computeResources.descriptorSet, vk::DescriptorType::eStorageImage, 0, &colorMap.descriptorInfo),
+		createWriteDescriptorSet(computeResources.descriptorSet, vk::DescriptorType::eStorageImage, 1, &computeTarget.descriptorInfo),
+	};
+	device.updateDescriptorSets(compute_write_descriptor_sets.size(), compute_write_descriptor_sets.data(), 0, nullptr);
+
+	/* Compute shader pipeline */
+	/* One pipeline per effect */
+	auto compute_pipeline_info = vk::ComputePipelineCreateInfo{};
+	compute_pipeline_info.layout = computeResources.pipelineLayout;
+	compute_pipeline_info.stage = loadShaderFromFile(device, "emboss.comp.spv", vk::ShaderStageFlagBits::eCompute);
+	auto pipeline = vk::Pipeline{};
+	VK_ASSERT(device.createComputePipelines(pipelineCache, 1, &compute_pipeline_info, nullptr, &pipeline));
+	computeResources.pipelines.push_back(pipeline);
+
+	auto cmd_pool_info = vk::CommandPoolCreateInfo{};
+	cmd_pool_info.queueFamilyIndex = computeResources.graphicsFamilyIndex;
+	cmd_pool_info.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+	VK_ASSERT(device.createCommandPool(&cmd_pool_info, nullptr, &computeResources.commandPool));
+
+	/* Command buffer for compute operations */
+	auto cmd_buffer_allocate_info = vk::CommandBufferAllocateInfo{};
+	cmd_buffer_allocate_info.commandPool = computeResources.commandPool;
+	cmd_buffer_allocate_info.level = vk::CommandBufferLevel::ePrimary;
+	cmd_buffer_allocate_info.commandBufferCount = 1;
+
+	VK_ASSERT(device.allocateCommandBuffers(&cmd_buffer_allocate_info, &computeResources.commandBuffer));
+
+	/* Fence for compute synchronization */
+	auto fence_info = vk::FenceCreateInfo{};
+	fence_info.flags = vk::FenceCreateFlagBits::eSignaled;
+	VK_ASSERT(device.createFence(&fence_info, nullptr, &computeResources.fence));
+
+	setupComputeCommandBuffer();
+}
+
+auto GMU::findComputeQueue() -> void
+{
+	uint32_t queue_family_count;
+	physicalDevice.getQueueFamilyProperties(&queue_family_count, nullptr);
+	assert(queue_family_count >= 1);
+
+	auto queue_family_properties = std::vector<vk::QueueFamilyProperties>{};
+	queue_family_properties.resize(queue_family_count);
+	physicalDevice.getQueueFamilyProperties(&queue_family_count, queue_family_properties.data());
+
+	auto compute_queue_found = false;
+	for (uint32_t i = 0; i < static_cast<uint32_t>(queue_family_properties.size()); i++) {
+		if ((queue_family_properties[i].queueFlags & vk::QueueFlagBits::eCompute) && (queue_family_properties[i].queueFlags & vk::QueueFlagBits::eGraphics) == static_cast<vk::QueueFlagBits>(0)) {
+			computeResources.graphicsFamilyIndex = i;
+			compute_queue_found = true;
+			break;
+		}
+	}
+
+	if (!compute_queue_found) {
+		for (uint32_t i = 0; i < static_cast<uint32_t>(queue_family_properties.size()); i++) {
+			if (queue_family_properties[i].queueFlags & vk::QueueFlagBits::eCompute) {
+				computeResources.graphicsFamilyIndex = i;
+				compute_queue_found = true;
+				break;
+			}
+		}
+	}
+	assert(compute_queue_found);
+
+	device.getQueue(computeResources.graphicsFamilyIndex, 0, &computeResources.queue);
+}
+
+auto GMU::setupComputeCommandBuffer() -> void
+{
+	computeResources.queue.waitIdle();
+	computeResources.commandBuffer.begin(vk::CommandBufferBeginInfo{});
+
+	computeResources.commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, computeResources.pipelines[computeResources.pipelineIndex]);
+	computeResources.commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, computeResources.pipelineLayout, 0, 1, &computeResources.descriptorSet, 0, nullptr);
+
+	computeResources.commandBuffer.dispatch(computeTarget.width / 16, computeTarget.height / 16, 1);
+	computeResources.commandBuffer.end();
+}
+
+auto GMU::setupPipelines() -> void
 {
 	vk::PipelineInputAssemblyStateCreateInfo input_assembly_state = {};
 	input_assembly_state.topology = vk::PrimitiveTopology::eTriangleList;
@@ -173,7 +278,7 @@ auto VKPBR::setupPipelines() -> void
 
 	vk::PipelineRasterizationStateCreateInfo rasterization_state = {};
 	rasterization_state.polygonMode = vk::PolygonMode::eFill;
-	rasterization_state.cullMode = vk::CullModeFlagBits::eBack;
+	rasterization_state.cullMode = vk::CullModeFlagBits::eNone;
 	rasterization_state.frontFace = vk::FrontFace::eCounterClockwise;
 	rasterization_state.flags = static_cast<vk::PipelineRasterizationStateCreateFlagBits>(0);
 	rasterization_state.lineWidth = 1.0f;
@@ -187,18 +292,16 @@ auto VKPBR::setupPipelines() -> void
 	color_blend_state.pAttachments = &blend_attachment;
 
 	vk::PipelineDepthStencilStateCreateInfo depth_stencil_state = {};
-	depth_stencil_state.depthTestEnable = false;
-	depth_stencil_state.depthWriteEnable = false;
+	depth_stencil_state.depthTestEnable = true;
+	depth_stencil_state.depthWriteEnable = true;
 	depth_stencil_state.depthCompareOp = vk::CompareOp::eLessOrEqual;
 
 	vk::PipelineViewportStateCreateInfo viewport_state = {};
 	viewport_state.viewportCount = 1;
 	viewport_state.scissorCount = 1;
-	//TODO: flas = 0;
 
 	vk::PipelineMultisampleStateCreateInfo multisample_state = {};
 	multisample_state.rasterizationSamples = vk::SampleCountFlagBits::e1;
-	//todo: flags= 0;
 
 	auto dynamic_states = std::vector<vk::DynamicState> {
 		vk::DynamicState::eViewport,
@@ -207,16 +310,22 @@ auto VKPBR::setupPipelines() -> void
 	vk::PipelineDynamicStateCreateInfo dynamic_state;
 	dynamic_state.pDynamicStates = dynamic_states.data();
 	dynamic_state.dynamicStateCount = dynamic_states.size();
-	//todo :: flags
+
+
+
+	std::array<vk::PipelineShaderStageCreateInfo, 2> shader_stages;
+	/* Compute filter shaders  */
+	shader_stages[0] = loadShaderFromFile(device, "pbr_basic.vert.spv", vk::ShaderStageFlagBits::eVertex);
+	shader_stages[1] = loadShaderFromFile(device, "pbr_basic.frag.spv", vk::ShaderStageFlagBits::eFragment);
+
 
 	vk::GraphicsPipelineCreateInfo pipeline_create_info = {};
-	pipeline_create_info.layout = pipelineLayout;
+	pipeline_create_info.layout = graphicsResources.pipelineLayout;
 	pipeline_create_info.renderPass = renderPass;
 	pipeline_create_info.basePipelineHandle = nullptr;
 	pipeline_create_info.basePipelineIndex = -1;
 
-	std::array<vk::PipelineShaderStageCreateInfo, 2> shader_stages;
-
+	pipeline_create_info.pVertexInputState = &vertices.inputState;
 	pipeline_create_info.pInputAssemblyState = &input_assembly_state;
 	pipeline_create_info.pRasterizationState = &rasterization_state;
 	pipeline_create_info.pColorBlendState = &color_blend_state;
@@ -227,88 +336,150 @@ auto VKPBR::setupPipelines() -> void
 	pipeline_create_info.stageCount = static_cast<uint32_t>(shader_stages.size());
 	pipeline_create_info.pStages = shader_stages.data();
 
-	/* Vertexx bindings and attributes */
-	/* Binding description */
-	auto vertex_input_bindings = std::vector<vk::VertexInputBindingDescription>{
-		vk::VertexInputBindingDescription(0, vertexLayout.stride(), vk::VertexInputRate::eVertex),
-	};
-
-	/* Attribute description */
-	auto vertex_input_Attributes = std::vector<vk::VertexInputAttributeDescription>{
-		vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32Sfloat, 0), // Position
-		vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32Sfloat, sizeof(float) * 3), // Normal
-	};
-
-	vk::PipelineVertexInputStateCreateInfo vertex_input_state = {};
-	vertex_input_state.vertexBindingDescriptionCount = static_cast<uint32_t>(vertex_input_bindings.size());
-	vertex_input_state.pVertexBindingDescriptions = vertex_input_bindings.data();
-	vertex_input_state.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertex_input_Attributes.size());
-	vertex_input_state.pVertexAttributeDescriptions = vertex_input_Attributes.data();
-
-	pipeline_create_info.pVertexInputState = &vertex_input_state;
-
-	/* PBR pipeline */
-	shader_stages[0] = loadShaderFromFile(device, "pbr_basic.vert.spv", vk::ShaderStageFlagBits::eVertex);
-	shader_stages[1] = loadShaderFromFile(device, "pbr_basic.frag.spv", vk::ShaderStageFlagBits::eFragment);
-
-	/* Enable depth test and write */
-	depth_stencil_state.depthTestEnable = true;
-	depth_stencil_state.depthWriteEnable = true;
-
-	/* Flip cull mode */
-	rasterization_state.cullMode = vk::CullModeFlagBits::eFront;
-
-	VK_ASSERT(device.createGraphicsPipelines(pipelineCache, 1, &pipeline_create_info, nullptr, &pipeline));
+	VK_ASSERT(device.createGraphicsPipelines(pipelineCache, 1, &pipeline_create_info, nullptr, &graphicsResources.pipeline));
 }
 
-auto VKPBR::setupUniformBuffers() -> void
+auto GMU::setupDescriptorPool() -> void
 {
-	/* Vertex shader uniform buffer */
+	auto pool_sizes = std::vector<vk::DescriptorPoolSize>{
+		/* Graphics pipeline UBO */
+		vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 2),
+		/* Graphics pipeline image sampler for displaying output image */
+		vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 2),
+		/* Compute pipeline uses a storage image for image read/write */
+		vk::DescriptorPoolSize(vk::DescriptorType::eStorageImage, 2),
+	};
+
+	auto descriptor_pool_info = vk::DescriptorPoolCreateInfo{};
+	descriptor_pool_info.pPoolSizes = pool_sizes.data();
+	descriptor_pool_info.poolSizeCount = pool_sizes.size();
+	descriptor_pool_info.maxSets = 3;
+
+	VK_ASSERT(device.createDescriptorPool(&descriptor_pool_info, nullptr, &descriptorPool));
+}
+
+auto GMU::setupUniformBuffers() -> void
+{
 	vulkanDevice->createBuffer(
-		sizeof(uboMatrices),
+		sizeof(UBOmatrices),
 		vk::BufferUsageFlagBits::eUniformBuffer,
 		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
-		uniformBuffers.object
+		uniformBuffer
 	);
 
-	vulkanDevice->createBuffer(
-		sizeof(uboParams),
-		vk::BufferUsageFlagBits::eUniformBuffer,
-		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
-		uniformBuffers.parameters
-	);
-
-	VK_ASSERT(uniformBuffers.object.map());
-	VK_ASSERT(uniformBuffers.parameters.map());
+	VK_ASSERT(uniformBuffer.map());
 
 	updateUniformBuffers();
-	updateUniformParameters();
 }
 
-auto VKPBR::updateUniformBuffers() -> void
+auto GMU::updateUniformBuffers() -> void
 {
-	/* 3D object parameters */
-	uboMatrices.model = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f + (models.objectIndex == 1 ? 45.0f : 0.0f)), glm::vec3(0.0f, 1.0f, 0.0f));
-	uboMatrices.view = camera.matrices.view;
-	uboMatrices.projection = camera.matrices.perspective;
-	uboMatrices.cameraPosition = camera.position * -1.0f;
+	uboMatrices.projection = glm::perspective(
+		glm::radians(60.f),
+		static_cast<float>(settings.width) * 0.5f / static_cast<float>(settings.height),
+		0.1f,
+		256.0f
+	);
+	const auto view_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -2.0f));
 
-	memcpy(uniformBuffers.object.mapped, &uboMatrices, sizeof(uboMatrices));
+	uboMatrices.model = view_matrix * glm::translate(glm::mat4(1.0f), cameraPos);
+	uboMatrices.model = glm::rotate(uboMatrices.model, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	uboMatrices.model = glm::rotate(uboMatrices.model, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	uboMatrices.model = glm::rotate(uboMatrices.model, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+
+	memcpy(uniformBuffer.mapped, &uboMatrices, sizeof(UBOmatrices));
 }
 
-auto VKPBR::updateUniformParameters() -> void
+auto GMU::setupTextureTarget(vkpbr::Texture* texture_target, const uint32_t width, const uint32_t height, const vk::Format format) -> void
 {
-	const auto p = 15.0f;
-	uboParams.lights[0] = glm::vec4(-p, -p * 0.5f, -p, 1.0f);
-	uboParams.lights[1] = glm::vec4(-p, -p * 0.5f, p, 1.0f);
-	uboParams.lights[2] = glm::vec4(p, -p * 0.5f, p, 1.0f);
-	uboParams.lights[3] = glm::vec4(p, -p * 0.5f, -p, 1.0f);
+	vk::FormatProperties format_properties;
+	physicalDevice.getFormatProperties(format, &format_properties);
 
-	memcpy(uniformBuffers.parameters.mapped, &uboParams, sizeof(uboParams));
+	/* Must support image storage operations */
+	assert(format_properties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eStorageImage);
+
+
+	texture_target->width = width;
+	texture_target->height = height;
+
+	vk::ImageCreateInfo image_info = {};
+	image_info.imageType = vk::ImageType::e2D;
+	image_info.format = format;
+	image_info.extent = vk::Extent3D{ width, height, 1 };
+	image_info.mipLevels = 1;
+	image_info.arrayLayers = 1;
+	image_info.samples = vk::SampleCountFlagBits::e1;
+	image_info.tiling = vk::ImageTiling::eOptimal;
+	image_info.usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage; // sampled by fragment shader & storage target in compute shader
+	image_info.sharingMode = vk::SharingMode::eExclusive; // ownership does not need to be transfered explicitly between compute & graphics queue
+
+	vk::MemoryAllocateInfo memory_allocate_info = {};
+	vk::MemoryRequirements memory_requirements = {};
+
+	VK_ASSERT(device.createImage(&image_info, nullptr, &texture_target->image));
+
+
+	device.getImageMemoryRequirements(texture_target->image, &memory_requirements);
+	memory_allocate_info.allocationSize = memory_requirements.size;
+	memory_allocate_info.memoryTypeIndex = vulkanDevice->findMemoryType(memory_requirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
+	VK_ASSERT(device.allocateMemory(&memory_allocate_info, nullptr, &texture_target->deviceMemory));
+	device.bindImageMemory(texture_target->image, texture_target->deviceMemory, 0);
+
+
+	auto layout_command = vulkanDevice->createCommandBuffer(vk::CommandBufferLevel::ePrimary, true);
+
+	texture_target->imageLayout = vk::ImageLayout::eGeneral;
+	setImageLayout(
+		layout_command,
+		texture_target->image,
+		vk::ImageAspectFlagBits::eColor,
+		vk::ImageLayout::eUndefined,
+		texture_target->imageLayout
+	);
+
+	vulkanDevice->finishAndSubmitCmdBuffer(layout_command, queue, true);
+
+	/* Create sampler */
+	vk::SamplerCreateInfo sampler = {};
+	sampler.magFilter = vk::Filter::eLinear;
+	sampler.minFilter = vk::Filter::eLinear;
+	sampler.mipmapMode = vk::SamplerMipmapMode::eLinear;
+	sampler.addressModeU = vk::SamplerAddressMode::eClampToBorder;
+	sampler.addressModeV = sampler.addressModeU;
+	sampler.addressModeW = sampler.addressModeU;
+	sampler.mipLodBias = 0.0f;
+	sampler.maxAnisotropy = 1.0f;
+	sampler.compareOp = vk::CompareOp::eNever;
+	sampler.minLod = 0.0f;
+	sampler.maxLod = texture_target->mipLevels;
+	sampler.borderColor = vk::BorderColor::eFloatOpaqueWhite;
+	VK_ASSERT(device.createSampler(&sampler, nullptr, &texture_target->textureSampler));
+
+	/* Create image view */
+	vk::ImageViewCreateInfo view_info = {};
+	view_info.image = nullptr;
+	view_info.viewType = vk::ImageViewType::e2D;
+	view_info.format = format;
+	view_info.components = { vk::ComponentSwizzle::eR , vk::ComponentSwizzle::eG, vk::ComponentSwizzle::eB, vk::ComponentSwizzle::eA };
+	view_info.subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
+	view_info.image = texture_target->image;
+	device.createImageView(&view_info, nullptr, &texture_target->imageView);
+
+	/* Initialize descriptor */
+	texture_target->descriptorInfo.imageLayout = texture_target->imageLayout;
+	texture_target->descriptorInfo.imageView = texture_target->imageView;
+	texture_target->descriptorInfo.sampler = texture_target->textureSampler;
+	texture_target->device = vulkanDevice.get();
 }
 
-auto VKPBR::setupCommandBuffers() -> void
+auto GMU::setupCommandBuffers() -> void
 {
+	/* check cmd buffers */
+	if (!checkCmdBuffers()) {
+		device.freeCommandBuffers(commandPool, static_cast<uint32_t>(drawCalls.size()), drawCalls.data());
+		VulkanRenderer::setupCommandBuffers();
+	}
+
 	vk::CommandBufferBeginInfo buffer_begin_info = {};
 
 	const auto clear_values = std::vector<vk::ClearValue>{
@@ -317,6 +488,7 @@ auto VKPBR::setupCommandBuffers() -> void
 		),
 		vk::ClearDepthStencilValue(1.0f, 0)
 	};
+
 
 	vk::RenderPassBeginInfo renderpass_info = {};
 	renderpass_info.renderPass = renderPass;
@@ -328,20 +500,40 @@ auto VKPBR::setupCommandBuffers() -> void
 	renderpass_info.pClearValues = clear_values.data();
 
 	for (auto i = 0; i < drawCalls.size(); ++i) {
-		/* Target frame buffer*/
 		renderpass_info.framebuffer = framebuffers[i];
 
 		VK_ASSERT(drawCalls[i].begin(&buffer_begin_info));
+
+		/* image memory barrier -> make sure that compute shader finishes before sampling the texture */
+		auto memory_barrier = vk::ImageMemoryBarrier{};
+		memory_barrier.oldLayout = vk::ImageLayout::eGeneral;
+		memory_barrier.newLayout = vk::ImageLayout::eGeneral;
+		memory_barrier.image = computeTarget.image;
+		memory_barrier.subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
+		memory_barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
+		memory_barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+		drawCalls[i].pipelineBarrier(
+			vk::PipelineStageFlagBits::eComputeShader,
+			vk::PipelineStageFlagBits::eFragmentShader,
+			static_cast<vk::DependencyFlagBits>(0),
+			0,
+			nullptr,
+			0,
+			nullptr,
+			1,
+			&memory_barrier
+		);
+
 		drawCalls[i].beginRenderPass(&renderpass_info, vk::SubpassContents::eInline);
 
-		vk::Viewport viewport = {};
-		viewport.width = static_cast<float>(settings.width);
-		viewport.height = static_cast<float>(settings.height);
+		auto viewport = vk::Viewport{};
+		viewport.width = static_cast<float>(settings.width) * 0.5f;
+		viewport.height = static_cast<float>(settings.height) * 0.5f;
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f;
 		drawCalls[i].setViewport(0, 1, &viewport);
 
-		vk::Rect2D scissor = {};
+		auto scissor = vk::Rect2D{};
 		scissor.extent.width = settings.width;
 		scissor.extent.height = settings.height;
 		scissor.offset.x = 0;
@@ -349,41 +541,21 @@ auto VKPBR::setupCommandBuffers() -> void
 		drawCalls[i].setScissor(0, 1, &scissor);
 
 		vk::DeviceSize offsets[1] = { 0 };
+		drawCalls[i].bindVertexBuffers(0, 1, &vertexBuffer.buffer, offsets);
+		drawCalls[i].bindIndexBuffer(indexBuffer.buffer, 0, vk::IndexType::eUint32);
 
-		/* Objects */
-		drawCalls[i].bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
-		drawCalls[i].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-		drawCalls[i].bindVertexBuffers(VERTEX_BUFFER_BIND_ID, 1, &models.object[models.objectIndex].vertices.buffer, offsets);
-		drawCalls[i].bindIndexBuffer(models.object[models.objectIndex].indices.buffer, 0, vk::IndexType::eUint32);
+		/* LEFT pre compute */
+		drawCalls[i].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, graphicsResources.pipelineLayout, 0, 1, &graphicsResources.descriptorSetPreCompute, 0, nullptr);
+		drawCalls[i].bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsResources.pipeline);
+		drawCalls[i].drawIndexed(indexCount, 1, 0, 0, 0);
 
-		auto material = materials[materialIndex];
+		/* RIGHT post compute */
+		drawCalls[i].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, graphicsResources.pipelineLayout, 0, 1, &graphicsResources.descriptorSetPostCompute, 0, nullptr);
+		drawCalls[i].bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsResources.pipeline);
 
-		/* Single row */
-		/*
-		material.parameters.metallic = 1.0f;
-
-		const uint32_t object_count = 10;
-		for (uint32_t j = 0; j < object_count; j++) {
-			glm::vec3 position = glm::vec3(float(j - (object_count / 2.0f)) * 2.5f, 0.0f, 0.0f);
-			material.parameters.roughness = glm::clamp(static_cast<float>(j) / static_cast<float>(object_count), 0.005f, 1.0f);
-
-			drawCalls[i].pushConstants(pipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::vec3), &position);
-			drawCalls[i].pushConstants(pipelineLayout, vk::ShaderStageFlagBits::eFragment, sizeof(glm::vec3), sizeof(Material::PushBlock), &material);
-			drawCalls[i].drawIndexed(models.object[models.objectIndex].indexCount, 1, 0, 0, 0);
-		}
-		*/
-
-		/* Grid */
-		for (uint32_t y = 0; y < GRID_DIM; y++) {
-			for (uint32_t x = 0; x < GRID_DIM; x++) {
-				glm::vec3 pos = glm::vec3(float(x - (GRID_DIM / 2.0f)) * 2.5f, 0.0f, float(y - (GRID_DIM / 2.0f)) * 2.5f);
-				drawCalls[i].pushConstants(pipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::vec3), &pos);
-				material.parameters.metallic = glm::clamp((float)x / (float)(GRID_DIM - 1), 0.1f, 1.0f);
-				material.parameters.roughness = glm::clamp((float)y / (float)(GRID_DIM - 1), 0.05f, 1.0f);
-				drawCalls[i].pushConstants(pipelineLayout, vk::ShaderStageFlagBits::eFragment, sizeof(glm::vec3), sizeof(Material::PushBlock), &material);
-				drawCalls[i].drawIndexed(models.object[models.objectIndex].indexCount, 1, 0, 0, 0);
-			}
-		}
+		viewport.x = (float)settings.width / 2.0f;
+		drawCalls[i].setViewport(0, 1, &viewport);
+		drawCalls[i].drawIndexed(indexCount, 1, 0, 0, 0);
 
 		// draw ui
 
@@ -392,7 +564,18 @@ auto VKPBR::setupCommandBuffers() -> void
 	}	
 }
 
-auto VKPBR::render() -> void
+auto GMU::checkCmdBuffers() -> bool{
+	for (auto& draw_call : drawCalls)
+	{
+		if (draw_call == static_cast<vk::CommandBuffer>(nullptr))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+auto GMU::render() -> void
 {
 	if (!preparedToRender) {
 		return;
@@ -413,20 +596,26 @@ auto VKPBR::render() -> void
 	submit_info.pSignalSemaphores = &renderCompleteSemaphore;
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = &drawCalls[currentBuffer];
-
 	VK_ASSERT(queue.submit(1, &submit_info, memoryFences[currentBuffer]));
 
 	VulkanRenderer::submitFrame();
+
+	/* Dispatch compute */
+	device.waitForFences(1, &computeResources.fence, true, UINT64_MAX);
+	device.resetFences(1, &computeResources.fence);
+
+	auto compute_submit_info = vk::SubmitInfo{};
+	compute_submit_info.commandBufferCount = 1;
+	compute_submit_info.pCommandBuffers = &computeResources.commandBuffer;
+	VK_ASSERT(computeResources.queue.submit(1, &compute_submit_info, computeResources.fence));
 }
 
-auto VKPBR::updateView() -> void
+auto GMU::updateView() -> void
 {
 	updateUniformBuffers();
 }
 
-auto VKPBR::updateUI(const uint32_t object_index) -> void
+auto GMU::updateUI(const uint32_t object_index) -> void
 {
-	models.objectIndex = object_index;
-	updateUniformBuffers();
-	setupCommandBuffers();
+
 }
